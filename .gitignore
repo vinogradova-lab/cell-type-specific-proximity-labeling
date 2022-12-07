@@ -1,4 +1,4 @@
-.fasta
+fasta_files/*.fasta
 .DS_Store
 .ipynb_checkpoints/
 
