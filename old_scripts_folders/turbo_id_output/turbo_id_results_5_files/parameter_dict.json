@@ -1,0 +1,1 @@
+{"sum_value": -Infinity, "cv_value": Infinity, "numMissCleaved": 1, "mean_median_choice": "median", "remove_peptides_with_cys": "no", "pep_restriction_per_protein": 1, "experiment_type": "whole proteome", "filtering_decision": "yes", "output_type_decision": "averaged raw signal intensity"}
