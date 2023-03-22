@@ -1,3 +1,17 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from functools import reduce
+from csv import reader
+import warnings
+from sklearn.decomposition import PCA
+import plotly.express as px
+from plotly.subplots import make_subplots
+from scipy.stats import pearsonr
+import plotly.express as px
+warnings.filterwarnings('ignore')
+
 #Normalisation Functions/pca func
 def get_pca_plot(df, title_string): #df needs to be without log
     #remove index from data 
