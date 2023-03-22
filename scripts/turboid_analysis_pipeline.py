@@ -21,6 +21,10 @@ import scipy.stats as stat
 import dash_bio
 import plotly.express as px
 import json
+from cutoff_funcs import *
+from filter_funcs import *
+from norm_funcs import *
+from readin_funcs import * 
 warnings.filterwarnings('ignore')
 
 # %%
@@ -39,55 +43,32 @@ print("Number of Uniport IDs in TP list:", len(TP_list)) #2806
 print("Number of Uniport IDs in FP list:", len(FP_list)) #1077
 
 # %%
-#turn path into object 
-#input_folder_path = pathlib.Path(input_folder_path)
-#get absolute path
-#input_folder_path = input_folder_path.resolve()
-
-#output_folder_path = pathlib.Path(output_folder_path)
-#get absolute path
-#output_folder_path = output_folder_path.resolve()
-
-# %%
 #Get list of files of processed census-out files
 list_of_file_paths = list(input_folder_path.iterdir())
 list_of_file_paths = [x for x in list_of_file_paths if 'census-out' in x.stem]
 
 list_of_file_names = [file_path.stem for file_path in list_of_file_paths]
+print("Number of files: ", len(list_of_file_names))
 list_of_file_names
 
 # %%
-#Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate
-meta_data_list = []
-with open(input_folder_path / "metadata_col.csv", 'r') as read_obj:
-    csv_reader = reader(read_obj)
-    for row in csv_reader:
-        meta_data_list.append(row)
+#get file_channel dict
+file_channel_dict = get_channel_name_dict(input_folder_path, list_of_file_names)
+len(file_channel_dict)
 
-# %%
-file_channel_dict = {}
-file_turbo_id_dict = {}
-for file_name in list_of_file_names:
-    channel_dict = {}
-    turboid_dict = {}
-    for meta_data_item in meta_data_list[1:]:
-        if file_name in meta_data_item:
-            channel_dict[meta_data_item[1]] = meta_data_item[2]
-            turboid_dict[meta_data_item[2]] = float(meta_data_item[4])
-    file_channel_dict[file_name] = channel_dict
-    file_turbo_id_dict[file_name] = turboid_dict
-
-# %% 
-with open(output_folder_path / "file_details.json", "w") as outfile:
-    json.dump(file_channel_dict, outfile)
+#%%
+#get condition dict
+file_condition_dict = get_cond_info(input_folder_path, list_of_file_names)
+len(file_condition_dict)
 
 # %%
 #get list of keratins uniprot ids 
 keratins = fasta_table[fasta_table.keratin == True]
-keratins_list = keratins.uniprot_id.tolist()
+keratins_list = keratins.index.tolist()
+len(keratins_list)
 
 # %%
-#save new dfs in folder 
+#Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate
 folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -116,82 +97,9 @@ for file in list_of_file_paths:
     dfs_dict[file_name] = merged_df
     merged_df.to_csv(folder_path / (file.stem + ".csv"))
 
-# %% [markdown]
-# **Get condition information from conditions_metadata.csv**
 
 # %%
-condition_list = []
-with open(input_folder_path / "conditions_metadata.csv", 'r') as read_obj:
-    csv_reader = reader(read_obj)
-    for row in csv_reader:
-        condition_list.append(row)
-
-# %%
-file_condition_dict = {}
-for file_name in list_of_file_names:
-    condition_dict = {}
-    for file_row in condition_list[1:]:
-        if file_name in file_row:
-            condition_dict["conditions"] = file_row[1].replace(" ", "").split(",")
-            condition_dict["control_labelling"] = file_row[2]
-            condition_dict["treatment_labelling"] = file_row[3]
-    file_condition_dict[file_name] = condition_dict
-
-# %% [markdown]
-# **Filter based on condition**
-
-# %%
-#Functions for Filtering
-def get_condition_df(df, condition_name):
-    sub_df = df.filter(regex=condition_name)
-    return(sub_df)
-
-def filter_condition_df(sub_df, condition_cols_contain, control_cols_contain):
-    cond_columns = sub_df.filter(like=condition_cols_contain).columns.tolist()
-    ctrl_columns = sub_df.filter(like=control_cols_contain).columns.tolist()
-    
-    if len(cond_columns) == 3:
-        column_pairs = [[cond_columns[0], cond_columns[1]], 
-                        [cond_columns[0], cond_columns[2]], 
-                        [cond_columns[1], cond_columns[2]]]
-    elif len(cond_columns) == 4:
-        column_pairs = [[cond_columns[0], cond_columns[1]], 
-                        [cond_columns[0], cond_columns[2]], 
-                        [cond_columns[0], cond_columns[3]], 
-                        [cond_columns[1], cond_columns[2]], 
-                        [cond_columns[1], cond_columns[3]], 
-                        [cond_columns[2], cond_columns[3]]]
-    elif len(cond_columns) == 5:
-        column_pairs = [[cond_columns[0], cond_columns[1]], 
-                        [cond_columns[0], cond_columns[2]], 
-                        [cond_columns[0], cond_columns[3]], 
-                        [cond_columns[0], cond_columns[4]], 
-                        [cond_columns[1], cond_columns[2]], 
-                        [cond_columns[1], cond_columns[3]], 
-                        [cond_columns[1], cond_columns[4]], 
-                        [cond_columns[2], cond_columns[3]],
-                        [cond_columns[2], cond_columns[4]],
-                        [cond_columns[3], cond_columns[4]]]
-        
-    list_of_uniprots = []
-    for columnpair in column_pairs: 
-        filter_df = sub_df[columnpair]
-        filter_df["sum"] = filter_df[columnpair].sum(axis=1)
-        filter_df["cv"] = filter_df[columnpair].std(axis=1).div(filter_df[columnpair].mean(axis=1))
-        filter_df = filter_df[(filter_df["sum"] >= 10000) & (filter_df["cv"] <= 0.5)]
-        filter_df = filter_df.reset_index()
-        filter_df_ids = filter_df.uniprot_id.tolist()
-        [list_of_uniprots.append(item) for item in filter_df_ids if item not in list_of_uniprots]
-            
-    sub_df = sub_df.reset_index()
-    sub_df = sub_df[sub_df["uniprot_id"].isin(list_of_uniprots)]
-    sub_df = sub_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
-    
-    return(sub_df, cond_columns, ctrl_columns)
-
-
-# %%
-#save new dfs in folder 
+#Filter based on condition 
 folder_path = output_folder_path / "02_filtering_per_cond_per_file"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -227,103 +135,8 @@ for file_name in list_of_file_names:
     filtered_dict[file_name] = sub_raw_df
     sub_raw_df.to_csv(folder_path / (file_name + ".csv"))
 
-# %% [markdown]
-# **Normalisation**
-# 
+# %%
 # (1) generate the output put with raw SI and annotation TP/FP; (2) look at TP proteins with 2+ peptides; (3) calculate median SI for each cre+ channel and median of sums; (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and (5) use those normalization values for each channel;
-
-# %%
-#Normalisation Functions/pca func
-def get_pca_plot(df, title_string): #df needs to be without log
-    #remove index from data 
-    df.head()
-    df = df.reset_index()
-    df = df.drop("description", 1)
-    df = df.drop("pep_num", 1)
-    df = df.drop("uniprot_id", 1)
-    df = df.drop("annotation", 1)
-    #drop na
-    df = df.dropna()
-    #number_of_proteins_in_common = df.shape[0]
-
-    #log2 transform
-    df_log = np.log2(df)
-    df_log = df_log.replace(-np.inf, np.nan)
-    df_log = df_log.dropna()
-    number_of_proteins_in_common = df_log.shape[0]
-    
-    #transpose table
-    df_log_t = df_log.transpose()
-    df_log_t.reset_index(inplace=True)
-    df_log_t = df_log_t.rename(columns={"index":"channel_name"})
-
-    #get X and y 
-    X = df_log_t.drop('channel_name', 1)
-    y = df_log_t['channel_name']
-
-    #get PCA 2, fit transform, get df 
-    pca = PCA(n_components=2)
-    principalComponents = pca.fit_transform(X)
-    principalDf = pd.DataFrame(data = principalComponents, 
-                               columns = ['principal component 1', 'principal component 2'])
-    #add channel name
-    finalDf = pd.concat([principalDf, df_log_t[['channel_name']]], axis = 1)
-
-    #get PCA %
-    pca_1_percent = round((pca.explained_variance_ratio_[0] * 100),2)
-    pca_2_percent = round((pca.explained_variance_ratio_[1] * 100),2)
-
-    #add condition
-    finalDf["condition"] = finalDf["channel_name"]
-    finalDf["condition"] = finalDf["condition"].str[:-2]
-    
-    #get range
-    range_list = []
-
-    range_list.append(finalDf["principal component 1"].max())
-    range_list.append(finalDf["principal component 1"].min())
-
-    range_list.append(finalDf["principal component 2"].max())
-    range_list.append(finalDf["principal component 2"].min())
-
-    max_number = max(range_list)+10
-    min_number = min(range_list)-10
-
-    fig = px.scatter(finalDf, 
-                     x='principal component 1', 
-                     y='principal component 2', 
-                     hover_data=['channel_name'], 
-                     color=finalDf['condition'],
-                     color_discrete_sequence=["orange", "green", "blue", "purple", "gold", "lime", "dodgerblue", "rosybrown", "black"],  #, , , "lightblue", , "black", , "peru", , , "indigo", "teal", , "cyan", "fuchsia"
-                     labels={
-                         "principal component 1": "PC1 ({}%)".format(pca_1_percent),
-                         "principal component 2": "PC2 ({}%)".format(pca_2_percent),
-                         "condition": "Condition"},
-                     title=title_string+" ("+str(number_of_proteins_in_common)+" Proteins)")
-
-    fig.update_xaxes(dtick=10, range=[min_number, max_number])
-    fig.update_yaxes(dtick=10, range=[min_number, max_number])
-
-    fig.update_layout(plot_bgcolor='rgb(243, 243, 243)', 
-                      height=500, width=600, showlegend=True)
-    return(fig)
-
-def pearson_corr_channels(df, file_name, folder_path, title_str):
-    pearsoncorr = df.corr(method='pearson')
-
-    fig, ax = plt.subplots(figsize=(15,15))  
-    sns.heatmap(pearsoncorr, 
-                xticklabels=pearsoncorr.columns,
-                yticklabels=pearsoncorr.columns,
-                cmap='RdBu_r',
-                annot=True,
-                linewidth=0.5,
-                center=0.)
-    ax.set_title(title_str+'- Pearson Correlation of Channels')
-    plt.savefig(folder_path / (file_name+"_"+title_str+"_cor.png"))
-    return("complete")
-
-# %%
 normalized_dict = {}
 
 folder_path = output_folder_path / "03_normalisation_plots"
@@ -429,161 +242,9 @@ for file_name in list_of_file_names:
     print("")
     df.to_csv(folder_path / (file_name + ".csv"))
 
-# %% [markdown]
-# **FUNCTIONS for cutoff analysis**
 
 # %%
-def get_ratio_condition_df(sub_df, cond_columns, ctrl_columns):
-    for condition in cond_columns:
-        for control in ctrl_columns:
-            sub_df["ratio_"+condition+"/"+control] = sub_df[condition] / sub_df[control]
-        
-    ratio_df = sub_df.filter(regex='ratio_')
-    return(ratio_df)
-
-def get_cutoffs(ratio_dfs_dict, folder_path, all_cond_cutoff_tables, sub_cutoff_dict):
-    
-    folder_path = folder_path / ('plots')
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
-    
-    for condition, table in ratio_dfs_dict.items():     
-        this_condition_full_tables = []
-        this_condition_cutoff_tables = []
-    
-        columns_list = table.columns.tolist()
-        table = table.reset_index()
-    
-        for column in columns_list:
-            
-            #get replicate
-            df_rep = table[["uniprot_id", "annotation", column]]
-        
-            #f.write("Analyzing: " + column + "\n")
-        
-            #normalize ratios
-            median_FP_ratio = df_rep.loc[df_rep['annotation'] == 'FP', column].median()
-            #print(column)
-            #print(median_FP_ratio)
-            #df_rep[df_rep['annotation'] == 'FP'].to_csv("A.csv")
-            #break
-            
-            df_rep[column] = df_rep[column].div(median_FP_ratio)
-            df_rep["norm_"+column] = df_rep[column]
-            
-            df_rep[column] = np.log2(df_rep[column]) 
-            log2_norm_ratio_column = column.replace("ratio_", "log2_norm_ratio_")
-            df_rep.rename(columns={column: log2_norm_ratio_column}, inplace=True)
-            column = column.replace("ratio_", "")
-
-            df_rep = df_rep[df_rep[log2_norm_ratio_column].notna()]
-        
-            #get total number of annotated TP and FP
-            total_TP = len(df_rep[df_rep["annotation"] == "TP"])
-            total_FP = len(df_rep[df_rep["annotation"] == "FP"])
-        
-            #rank ratio in descending order
-            df_rep = df_rep.sort_values(log2_norm_ratio_column, ascending=False)
-        
-            #clean up index
-            df_rep = df_rep.reset_index(drop=True)
-            #get index as list
-            index_list = df_rep.index.values.tolist()
-        
-            #for each row calculate number of TP and FP in all the rows before
-            for row_number in index_list:
-                if row_number == 0:
-                    df_rep.loc[df_rep.index[row_number], 'FP'] = 0
-                    df_rep.loc[df_rep.index[row_number], 'TP'] = 0
-            
-                else:
-                    results_dict = {}
-                    subset_df = df_rep.loc[0:row_number-1]
-                    for idx, name in enumerate(subset_df.annotation.value_counts().index.tolist()):
-                        results_dict[name] = subset_df.annotation.value_counts()[idx]
-
-                    if 'FP' in results_dict:
-                        df_rep.loc[df_rep.index[row_number], 'FP'] = results_dict["FP"]
-                    else:
-                        df_rep.loc[df_rep.index[row_number], 'FP'] = 0
-                    if 'TP' in results_dict:
-                        df_rep.loc[df_rep.index[row_number], 'TP'] = results_dict["TP"]
-                    else:
-                        df_rep.loc[df_rep.index[row_number], 'TP'] = 0
-
-            #calculate TPR and FPR
-            df_rep["TPR"] = df_rep["TP"] / total_TP
-            df_rep["FPR"] = df_rep["FP"] / total_FP
-        
-            #plot TPR and FPR
-            plt.figure()
-            plt.plot(df_rep["FPR"], df_rep["TPR"], color='red', label='ROC')
-            plt.plot([0, 1], [0, 1], color='green', linestyle='--')
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.title(column)
-            plt.legend()
-            plt.savefig(folder_path / (column.replace("/","-")+"_roc.png"))
-        
-            #calculate TPR-FPR, get cutoff value = maximum TPR-FPR value
-            df_rep["TPR-FPR"] = df_rep["TPR"] - df_rep["FPR"]
-            cutoff_value = df_rep.loc[df_rep["TPR-FPR"].idxmax()][log2_norm_ratio_column]
-            #f.write("Cutoff value:" + str(cutoff_value) + "\n")
-            sub_cutoff_dict[column] = cutoff_value
-    
-            #plot log2 ratio and TPR-FPR
-            plt.figure()
-            ax = sns.lineplot(df_rep[log2_norm_ratio_column], df_rep["TPR-FPR"])
-    
-            # Setting the X and Y Label
-            xlabel_string = "Log2(" + column + ")"
-            ax.set_xlabel(xlabel_string)
-            ax.set_ylabel('TPR-FPR')
-            ax.set_title("Cutoff:"+str(cutoff_value))
-            ax.axvline(cutoff_value, linewidth=1, color="black", linestyle = "--")
-            ax.figure.savefig(folder_path / (column.replace("/","-")+'_lineplot.png'))
-    
-            #Retain all proteins with log2 ratios higher than that of the determined cutoff
-            #label proteins with pass cutoff or did not pass cutoff 
-            #df_rep_cutoff["pass_cutoff"] = df_rep[log2_norm_ratio_column].where(df_rep[log2_norm_ratio_column] > cutoff_value, other='0')
-            df_rep["pass_cutoff"] = np.where(df_rep[log2_norm_ratio_column] > cutoff_value, 1, 0)
-            #df_rep_cutoff = df_rep[df_rep["FPR"] < 0.1] FDR 10 %
-        
-            this_condition_full_table = []
-            this_condition_cutoff_table = []
-        
-            this_condition_full_tables.append(df_rep)
-            this_condition_cutoff_tables.append(df_rep)
-    
-        all_cond_cutoff_tables[condition] = this_condition_cutoff_tables
-    return(all_cond_cutoff_tables)
-
-def add_pass_cutoff_analysis_to_df(ratio_and_signal_intensity_merged, df_all_list_columns_passcutoff):
-    new_list = df_all_list_columns_passcutoff+["uniprot_id"]
-    pass_cutoff_sub_df = ratio_and_signal_intensity_merged[new_list]
-    pass_cutoff_sub_df.columns = pass_cutoff_sub_df.columns.str.split('/').str[0]
-    pass_cutoff_sub_df.columns = pass_cutoff_sub_df.columns.str.replace('pass_cutoff_', "")
-    sum_pass_cutoff = pass_cutoff_sub_df.transpose().reset_index().groupby("index").max().transpose() 
-    sum_pass_cutoff.columns = sum_pass_cutoff.columns.str.rsplit("_", 1).str[0]
-    sum_pass_cutoff = sum_pass_cutoff.reset_index()
-    sum_pass_cutoff = sum_pass_cutoff.drop("index",1)
-    new_df = sum_pass_cutoff.transpose().reset_index().groupby("index").sum().transpose()
-    new_df = new_df.set_index("uniprot")
-    new_df = new_df.add_suffix('_pass_cutoff_sum')
-    col_list = new_df.columns.tolist()
-    for col in col_list:
-        new_df[col+"_min_2_cutoffs"] = new_df[col] >= 2
-    new_df["pass_cutoff_result"] = (new_df == True).any(axis=1)
-    new_df = new_df.reset_index()
-    new_df = new_df.rename(columns={"uniprot":"uniprot_id"})
-    ratio_and_signal_intensity_merged = ratio_and_signal_intensity_merged.reset_index()
-    with_cutoff_df = ratio_and_signal_intensity_merged.merge(new_df, on="uniprot_id") 
-    return(with_cutoff_df)
-
-# %% [markdown]
-# **Cutoff analysis of all files**
-
-# %%
+#Cutoff analysis of all files
 folder_path = output_folder_path / "05_cutoff_analysis"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -706,83 +367,9 @@ for file_name in list_of_file_names:
         ratio_and_signal_intensity_merged.to_excel(writer, sheet_name='ratio_raw_values', index=False)
         df_all.to_excel(writer, sheet_name='log2_norm_ratio', index=False)
 
-# %% [markdown]
-# **Analysis of Proteins that pass cutoff Filter (i.e. pass_cutoff_result=TRUE)**
 
 # %%
-def get_pca_plot_after(df, title_string): #df needs to be without log
-    #remove index from data 
-    df.head()
-    df = df.reset_index()
-    df = df.drop("Signal peptide", 1)
-    df = df.drop("uniprot_id", 1)
-    df = df.drop("annotation", 1)
-    #drop na
-    df = df.dropna()
-    #number_of_proteins_in_common = df.shape[0]
-
-    #log2 transform
-    df_log = np.log2(df)
-    df_log = df_log.replace(-np.inf, np.nan)
-    df_log = df_log.dropna()
-    number_of_proteins_in_common = df_log.shape[0]
-    #transpose table
-    df_log_t = df_log.transpose()
-    df_log_t.reset_index(inplace=True)
-    df_log_t = df_log_t.rename(columns={"index":"channel_name"})
-
-    #get X and y 
-    X = df_log_t.drop('channel_name', 1)
-    y = df_log_t['channel_name']
-
-    #get PCA 2, fit transform, get df 
-    pca = PCA(n_components=2)
-    principalComponents = pca.fit_transform(X)
-    principalDf = pd.DataFrame(data = principalComponents, 
-                               columns = ['principal component 1', 'principal component 2'])
-    #add channel name
-    finalDf = pd.concat([principalDf, df_log_t[['channel_name']]], axis = 1)
-
-    #get PCA %
-    pca_1_percent = round((pca.explained_variance_ratio_[0] * 100),2)
-    pca_2_percent = round((pca.explained_variance_ratio_[1] * 100),2)
-
-    #add condition
-    finalDf["condition"] = finalDf["channel_name"]
-    finalDf["condition"] = finalDf["condition"].str[:-2]
-    
-    #get range
-    range_list = []
-
-    range_list.append(finalDf["principal component 1"].max())
-    range_list.append(finalDf["principal component 1"].min())
-
-    range_list.append(finalDf["principal component 2"].max())
-    range_list.append(finalDf["principal component 2"].min())
-
-    max_number = max(range_list)+10
-    min_number = min(range_list)-10
-
-    fig = px.scatter(finalDf, 
-                     x='principal component 1', 
-                     y='principal component 2', 
-                     hover_data=['channel_name'], 
-                     color=finalDf['condition'],
-                     color_discrete_sequence=["orange", "green", "blue", "purple", "gold", "lime", "dodgerblue", "rosybrown", "black"],  #, , , "lightblue", , "black", , "peru", , , "indigo", "teal", , "cyan", "fuchsia"
-                     labels={
-                         "principal component 1": "PC1 ({}%)".format(pca_1_percent),
-                         "principal component 2": "PC2 ({}%)".format(pca_2_percent),
-                         "condition": "Condition"},
-                     title=title_string+" ("+str(number_of_proteins_in_common)+" Proteins)")
-
-    fig.update_xaxes(dtick=10, range=[min_number, max_number])
-    fig.update_yaxes(dtick=10, range=[min_number, max_number])
-
-    fig.update_layout(plot_bgcolor='rgb(243, 243, 243)', 
-                      height=500, width=600, showlegend=True)
-    return(fig)
-
-# %%
+#Analysis of Proteins that pass cutoff Filter (i.e. pass_cutoff_result=TRUE)
 input_folder_path = output_folder_path / "05_cutoff_analysis" 
 list_of_dir_paths = list(input_folder_path.iterdir())
 
@@ -980,20 +567,6 @@ for file_path in list_of_result_file_paths:
 # 
 
 # %%
-#FUNCTIONS
-def get_p_value(row, cond_1, cond_2):
-    ttest_result = stat.ttest_ind(row[cond_1],  row[cond_2])
-    return(ttest_result[1])
-
-def get_expr(row):
-    if (row['log2_FC'] > 0.58) & (row['-log10_pval'] > 1.3):
-        return("Up")
-    elif (row['log2_FC'] < -0.58) & (row['-log10_pval'] > 1.3):
-        return("Down")
-    else:
-        return("Stable")
-
-# %%
 folder_path = output_folder_path / "06_results" 
 volcano_plot_list_10plex = []
 volcano_plot_list_16plex = []
@@ -1171,8 +744,6 @@ with open(folder_path / 'volcano_plots_16plex.html' , 'w') as f:
     for fig in volcano_plot_list_16plex:
         f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
         
-
-# %%
 
 
 
