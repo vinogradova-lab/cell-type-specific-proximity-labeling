@@ -1,6 +1,3 @@
-# %% [markdown]
-# **Import libraries**
-
 # %%
 import os
 import pandas as pd
@@ -10,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
 from functools import reduce
-import pathlib
+from pathlib import Path
 from csv import reader
 %matplotlib inline
 import warnings
@@ -23,58 +20,46 @@ from scipy.stats import pearsonr
 import scipy.stats as stat
 import dash_bio
 import plotly.express as px
+import json
 warnings.filterwarnings('ignore')
-
-# %% [markdown]
-# **User input**
 
 # %%
 #provide folder paths
-input_folder_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/TurboID_analysis/analysis_results/11_files_turbo_id_2pepperprotein_03062023/01_processed_files/"
-output_path = '/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/TurboID_analysis/notebook_analysis/06_11files_030623/min_2_peptide_per_protein'
+input_folder_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/11_files_turbo_id_1pepperprotein_03062023/01_processed_files/")
+output_folder_path  = Path('/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/032223_results/min_1_pep_per_protein')
 
 #get master list
-master_list = pd.read_csv("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/TurboID_analysis/mouse_lists/master_list/mouse_master_table_for_ROC_analysis.csv", index_col=[0])
-TP_list = master_list[master_list["annotation"] == "TP"]
+fasta_table = pd.read_csv("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/02_mouse_TP_FP_table/main_fasta_table.csv", index_col=[0])
+TP_list = fasta_table[fasta_table["annotation"] == "TP"]
 #TP_list = TP_list["uniprot_id"].tolist()
-FP_list = master_list[master_list["annotation"] == "FP"]
+FP_list = fasta_table[fasta_table["annotation"] == "FP"]
 #FP_list = FP_list["uniprot_id"].tolist()
 
-print("Number of Uniport IDs in TP list:", len(TP_list)) #3436
-print("Number of Uniport IDs in FP list:", len(FP_list)) #4353
-
-# %% [markdown]
-# **Change path into path object**
+print("Number of Uniport IDs in TP list:", len(TP_list)) #2806
+print("Number of Uniport IDs in FP list:", len(FP_list)) #1077
 
 # %%
 #turn path into object 
-input_path_obj = pathlib.Path(input_folder_path)
+#input_folder_path = pathlib.Path(input_folder_path)
 #get absolute path
-input_path_obj = input_path_obj.resolve()
+#input_folder_path = input_folder_path.resolve()
 
-output_path_obj = pathlib.Path(output_path)
+#output_folder_path = pathlib.Path(output_folder_path)
 #get absolute path
-output_path_obj = output_path_obj.resolve()
-
-# %% [markdown]
-# **Get list of files in input folder**
+#output_folder_path = output_folder_path.resolve()
 
 # %%
-list_of_file_paths = list(input_path_obj.iterdir())
+#Get list of files of processed census-out files
+list_of_file_paths = list(input_folder_path.iterdir())
 list_of_file_paths = [x for x in list_of_file_paths if 'census-out' in x.stem]
 
-list_of_file_names = []
-for file_path in list_of_file_paths:
-    file_name = file_path.stem
-    list_of_file_names.append(file_name)
+list_of_file_names = [file_path.stem for file_path in list_of_file_paths]
 list_of_file_names
 
-# %% [markdown]
-# **Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate**
-
 # %%
+#Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate
 meta_data_list = []
-with open(input_path_obj / "metadata_col.csv", 'r') as read_obj:
+with open(input_folder_path / "metadata_col.csv", 'r') as read_obj:
     csv_reader = reader(read_obj)
     for row in csv_reader:
         meta_data_list.append(row)
@@ -92,14 +77,18 @@ for file_name in list_of_file_names:
     file_channel_dict[file_name] = channel_dict
     file_turbo_id_dict[file_name] = turboid_dict
 
+# %% 
+with open(output_folder_path / "file_details.json", "w") as outfile:
+    json.dump(file_channel_dict, outfile)
+
 # %%
 #get list of keratins uniprot ids 
-keratins = master_list[master_list.keratin == True]
+keratins = fasta_table[fasta_table.keratin == True]
 keratins_list = keratins.uniprot_id.tolist()
 
 # %%
 #save new dfs in folder 
-folder_path = output_path_obj / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
+folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -117,7 +106,7 @@ for file in list_of_file_paths:
     print(len(df))
     df = df.reset_index()
     df = df.rename(columns={"uniprot": "Entry"})
-    merged = df.merge(master_list[["annotation", "Entry"]], on="Entry", how="left")
+    merged = df.merge(fasta_table[["annotation", "Entry"]], on="Entry", how="left")
     merged = merged.drop_duplicates()
     merged = merged.rename(columns={"Entry": "uniprot_id"})
     #merged["annotation"].value_counts()
@@ -132,7 +121,7 @@ for file in list_of_file_paths:
 
 # %%
 condition_list = []
-with open(input_path_obj / "conditions_metadata.csv", 'r') as read_obj:
+with open(input_folder_path / "conditions_metadata.csv", 'r') as read_obj:
     csv_reader = reader(read_obj)
     for row in csv_reader:
         condition_list.append(row)
@@ -203,7 +192,7 @@ def filter_condition_df(sub_df, condition_cols_contain, control_cols_contain):
 
 # %%
 #save new dfs in folder 
-folder_path = output_path_obj / "02_filtering_per_cond_per_file"
+folder_path = output_folder_path / "02_filtering_per_cond_per_file"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -337,7 +326,7 @@ def pearson_corr_channels(df, file_name, folder_path, title_str):
 # %%
 normalized_dict = {}
 
-folder_path = output_path_obj / "03_normalisation_plots"
+folder_path = output_folder_path / "03_normalisation_plots"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -430,7 +419,7 @@ for file_name in list_of_file_names:
 
 # %%
 #save normalized df in folder
-folder_path = output_path_obj / "04_normalised"
+folder_path = output_folder_path / "04_normalised"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -595,7 +584,7 @@ def add_pass_cutoff_analysis_to_df(ratio_and_signal_intensity_merged, df_all_lis
 # **Cutoff analysis of all files**
 
 # %%
-folder_path = output_path_obj / "05_cutoff_analysis"
+folder_path = output_folder_path / "05_cutoff_analysis"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
     
@@ -605,7 +594,7 @@ for file_name in list_of_file_names:
     
     #create output folder
     folder_name = file_name.replace("processed_census-out_", "")
-    folder_path = output_path_obj / "05_cutoff_analysis" / folder_name
+    folder_path = output_folder_path / "05_cutoff_analysis" / folder_name
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
         
@@ -695,13 +684,13 @@ for file_name in list_of_file_names:
     columns_list_df_all = df_all_list_columns_TPRFPR + df_all_list_columns_passcutoff
     columns_list_df_all.append("uniprot_id")
     
-    #reduced_master_list = master_list.drop(master_list.columns[[0,-10,-9,-8,-7,-6]], axis = 1)
+    #reduced_fasta_table = fasta_table.drop(fasta_table.columns[[0,-10,-9,-8,-7,-6]], axis = 1)
     
     ratio_and_signal_intensity = ratio_and_signal_intensity.rename(columns={"uniprot_id": "Entry"})
     ratio_and_signal_intensity.drop('description', axis=1, inplace=True)
-    master_list = master_list.rename(columns={"uniprot_id": "alias_uniprot_id"})
+    fasta_table = fasta_table.rename(columns={"uniprot_id": "alias_uniprot_id"})
 
-    merged_with_metadata = pd.merge(ratio_and_signal_intensity, master_list, on=["Entry", "annotation"], how="left")
+    merged_with_metadata = pd.merge(ratio_and_signal_intensity, fasta_table, on=["Entry", "annotation"], how="left")
     merged_with_metadata = merged_with_metadata.rename(columns={"Entry": "uniprot_id"})
     merged_with_metadata = merged_with_metadata.drop_duplicates(subset='uniprot_id', keep='first')
     
@@ -794,7 +783,7 @@ def get_pca_plot_after(df, title_string): #df needs to be without log
     return(fig)
 
 # %%
-input_folder_path = output_path_obj / "05_cutoff_analysis" 
+input_folder_path = output_folder_path / "05_cutoff_analysis" 
 list_of_dir_paths = list(input_folder_path.iterdir())
 
 list_of_result_file_paths = []
@@ -806,7 +795,7 @@ for directory in list_of_dir_paths:
             list_of_result_file_paths.append(file_path)
 
 # %%
-folder_path = output_path_obj / "06_results" 
+folder_path = output_folder_path / "06_results" 
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -885,7 +874,7 @@ for file_path in list_of_result_file_paths:
         sheet_2 = sheet_2.set_index(["uniprot_id", "annotation"])
         list_columns_passcutoff = sheet_2.filter(like="pass_cutoff").columns.tolist()
         
-        folder_path = output_path_obj / "06_results" / file_path.stem
+        folder_path = output_folder_path / "06_results" / file_path.stem
         if not os.path.exists(folder_path):
             os.mkdir(folder_path)
             
@@ -1005,7 +994,7 @@ def get_expr(row):
         return("Stable")
 
 # %%
-folder_path = output_path_obj / "06_results" 
+folder_path = output_folder_path / "06_results" 
 volcano_plot_list_10plex = []
 volcano_plot_list_16plex = []
 
