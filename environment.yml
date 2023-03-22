@@ -1,5 +1,7 @@
 name: turbo_id_notebook
 channels:
+  - conda-forge
+  - anaconda
   - defaults
 dependencies:
   - argon2-cffi=21.3.0=pyhd3eb1b0_0
@@ -9,9 +11,10 @@ dependencies:
   - blas=1.0=mkl
   - bleach=4.1.0=pyhd3eb1b0_0
   - bzip2=1.0.8=h1de35cc_0
-  - ca-certificates=2022.07.19=hecd8cb5_0
+  - ca-certificates=2022.4.26=hecd8cb5_0
   - decorator=5.1.1=pyhd3eb1b0_0
   - defusedxml=0.7.1=pyhd3eb1b0_0
+  - et_xmlfile=1.1.0=py310hecd8cb5_0
   - executing=0.8.3=pyhd3eb1b0_0
   - intel-openmp=2021.4.0=hecd8cb5_3538
   - ipython_genutils=0.2.0=pyhd3eb1b0_1
@@ -28,7 +31,8 @@ dependencies:
   - mkl_random=1.2.2=py310hc081a56_0
   - ncurses=6.3=hca72f7f_3
   - numpy-base=1.23.1=py310hfd2de13_0
-  - openssl=1.1.1q=hca72f7f_0
+  - openpyxl=3.0.9=pyhd3eb1b0_0
+  - openssl=1.1.1o=hca72f7f_0
   - packaging=21.3=pyhd3eb1b0_0
   - pandocfilters=1.5.0=pyhd3eb1b0_0
   - parso=0.8.3=pyhd3eb1b0_0
@@ -44,6 +48,7 @@ dependencies:
   - python=3.10.4=hdfd78df_0
   - python-dateutil=2.8.2=pyhd3eb1b0_0
   - python-fastjsonschema=2.15.1=pyhd3eb1b0_0
+  - python_abi=3.10=2_cp310
   - readline=8.1.2=hca72f7f_1
   - send2trash=1.8.0=pyhd3eb1b0_1
   - six=1.16.0=pyhd3eb1b0_1
@@ -63,11 +68,13 @@ dependencies:
     - appnope==0.1.2
     - argon2-cffi-bindings==21.2.0
     - beautifulsoup4==4.11.1
+    - biopython==1.81
     - bottleneck==1.3.5
     - certifi==2022.6.15
     - cffi==1.15.1
     - debugpy==1.5.1
     - entrypoints==0.4
+    - et-xmlfile==1.1.0
     - ipykernel==6.9.1
     - ipython==8.4.0
     - jedi==0.18.1
