@@ -9,136 +9,173 @@ from pathlib import Path
 from sklearn.decomposition import PCA
 import plotly.express as px
 import plotly.graph_objects as go
-import scipy.stats as stat
 import plotly.express as px
+import json
 from src.cutoff_funcs import *
 from src.filter_funcs import *
 from src.norm_funcs import *
-from src.readin_funcs import * 
+from src.readin_funcs import *
+import logging
+
+# %% 
+# read in paths from json
+with open('paths.json') as paths_file:
+    file_contents = paths_file.read()
+
+paths_json = json.loads(file_contents)
 
 # %%
-#provide folder paths
-input_folder_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/11_files_turbo_id_1pepperprotein_03062023/01_processed_files/")
-output_folder_path  = Path('/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/032223_results/min_1_pep_per_protein')
+# paths % configs 
+input_folder_path = Path(paths_json['input_folder_path'])
+output_folder_path = Path(paths_json['output_folder_path'])
+fasta_table_path = Path(paths_json['fasta_table_path'])
+logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', filemode='w', encoding='utf-8', level=logging.INFO)
 
-#get master list
-fasta_table = pd.read_csv("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/02_mouse_TP_FP_table/main_fasta_table.csv", index_col=[0])
+# %%
+# read in fasta table containing TP and FP annotation 
+fasta_table = pd.read_csv(fasta_table_path, index_col=[0])
 TP_list = fasta_table[fasta_table["annotation"] == "TP"]
-#TP_list = TP_list["uniprot_id"].tolist()
 FP_list = fasta_table[fasta_table["annotation"] == "FP"]
-#FP_list = FP_list["uniprot_id"].tolist()
 
-print("Number of Uniport IDs in TP list:", len(TP_list)) #2806
-print("Number of Uniport IDs in FP list:", len(FP_list)) #1077
+logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
+logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
+
+assert len(TP_list) == 2806
+assert len(FP_list) == 1077
 
 # %%
-#Get list of files of processed census-out files
+# Get list of files, file_channel_dict and cond_dict of processed census-out files
 list_of_file_paths = list(input_folder_path.iterdir())
 list_of_file_paths = [x for x in list_of_file_paths if 'census-out' in x.stem]
 
 list_of_file_names = [file_path.stem for file_path in list_of_file_paths]
-print("Number of files: ", len(list_of_file_names))
-list_of_file_names
-
-# %%
-#get file_channel dict
 file_channel_dict = get_channel_name_dict(input_folder_path, list_of_file_names)
-len(file_channel_dict)
-
-#%%
-#get condition dict
 file_condition_dict = get_cond_info(input_folder_path, list_of_file_names)
-len(file_condition_dict)
+
+logging.info("Number of files: %s", len(list_of_file_names))
+logging.info(list_of_file_names)
+
+assert len(file_channel_dict) == len(list_of_file_names) == len(file_condition_dict)
 
 # %%
-#get list of keratins uniprot ids 
+# Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate TP and FP
 keratins = fasta_table[fasta_table.keratin == True]
 keratins_list = keratins.index.tolist()
-len(keratins_list)
 
-# %%
-#Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate
 folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
+logging.info('\n')
+logging.info("Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate TP and FP")
+
 dfs_dict = {}
 for file in list_of_file_paths:
     file_name = file.stem
+    logging.info("Processing: %s", file_name)
     df = pd.read_csv(file)
-    #remove keratins 
-    print(len(df))
+    
+    # remove keratins 
+    before_keratin_removal = len(df)
     df = df[~df.uniprot.isin(keratins_list)]
+    after_keratin_removal = len(df)
+    logging.info("Removed %s keratins", before_keratin_removal-after_keratin_removal)
+
+    # rename columns
     df = df.set_index(["uniprot", 'description', 'pep_num'])
-    #rename columns
     df.rename(columns=file_channel_dict[file_name], inplace=True)
-    #annotate TP FP
-    print(len(df))
+    
+    # annotate TP FP
     df = df.reset_index()
     df = df.rename(columns={"uniprot": "Entry"})
     merged = df.merge(fasta_table[["annotation", "Entry"]], on="Entry", how="left")
     merged = merged.drop_duplicates()
     merged = merged.rename(columns={"Entry": "uniprot_id"})
-    #merged["annotation"].value_counts()
-    print(len(merged))
-    print("")
+
+    assert after_keratin_removal == len(merged)
+
     merged_df = merged.set_index(["uniprot_id", "description", "pep_num", "annotation"])
     dfs_dict[file_name] = merged_df
-    merged_df.to_csv(folder_path / (file.stem + ".csv"))
+    merged_df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
 
+logging.info("FOLDER COMPLETE: 01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated")
 
 # %%
-#Filter based on condition 
-folder_path = output_folder_path / "02_filtering_per_cond_per_file"
+# Filter based on condition 
+folder_path = output_folder_path / "02_filtering_per_cond_per_file" 
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
+logging.info('\n')
+logging.info("Filter based on cre+ channels per condition per file")
+
 filtered_dict = {}
 for file_name in list_of_file_names:
-    #print(file_name)
+    file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
+    if not os.path.exists(file_folder_path):
+        os.mkdir(file_folder_path)
+
+    logging.info("Processing: %s", file_name.split("processed_census-out_")[1])
     
     df = dfs_dict[file_name]
+    before_filtering = len(df)
     conditions_list = file_condition_dict[file_name]["conditions"]
     control_labelling = file_condition_dict[file_name]["control_labelling"]
     treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
 
+    #filter each condition in file 
     filtered_sub_dfs = []
     for condition in conditions_list:
         sub_df = get_condition_df(df, condition)
         filtered_sub_df, cond_columns, ctrl_columns = filter_condition_df(sub_df, treatment_labelling, control_labelling)
         filtered_sub_df = filtered_sub_df.reset_index()
         filtered_sub_dfs.append(filtered_sub_df)
-    print("Filtering for %s done" % (file_name))
     
     merge_on_cols = ['uniprot_id','description', 'pep_num', "annotation"]
     filtered_final_table = reduce(lambda df1,df2: pd.merge(df1,df2,on=merge_on_cols, how="outer"), filtered_sub_dfs)
-    print(len(filtered_final_table))
-    
+
     raw_df = df.reset_index()
     uniprot_ids = filtered_final_table["uniprot_id"].tolist()
+
     sub_raw_df = raw_df[raw_df['uniprot_id'].isin(uniprot_ids)]
-    print(len(sub_raw_df))
-    
     sub_raw_df = sub_raw_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
 
+    logging.info("Proteins were filtered out, because they did not pass at least one condition: %s", before_filtering-len(sub_raw_df))
+    logging.info("Filtering for %s done", file_name)
+
     filtered_dict[file_name] = sub_raw_df
-    sub_raw_df.to_csv(folder_path / (file_name + ".csv"))
+    sub_raw_df.to_csv(file_folder_path / ("passed_filter_" + file_name + ".csv"))
+
+    # save filtered out proteins
+    filtered_out_df = raw_df[~raw_df['uniprot_id'].isin(uniprot_ids)]
+    filtered_out_df = filtered_out_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
+    filtered_out_df.to_csv(file_folder_path / ("removed_" + file_name + ".csv"))
+
 
 # %%
-# (1) generate the output put with raw SI and annotation TP/FP; (2) look at TP proteins with 2+ peptides; (3) calculate median SI for each cre+ channel and median of sums; (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and (5) use those normalization values for each channel;
-normalized_dict = {}
-
+# (1) generate the output put with raw SI and annotation TP/FP; 
+# (2) look at TP proteins with 2+ peptides; 
+# (3) calculate median SI for each cre+ channel and median of sums; 
+# (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and 
+# (5) use those normalization values for each channel;
 folder_path = output_folder_path / "03_normalisation_plots"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
+logging.info('\n')
+logging.info("Creating normalized tables and normalisation plots")
+
+normalized_dict = {}
 for file_name in list_of_file_names:
-    print(file_name)
-    plot_list = []
+    file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
+    if not os.path.exists(file_folder_path):
+        os.mkdir(file_folder_path)
+
+    logging.info("Processing %s", file_name)
     
+    plot_list = []
     fig = plt.figure(figsize=(25, 13)) 
     fig.suptitle(file_name)
-
     ax1 = plt.subplot(121) 
     ax2 = plt.subplot(122) 
     
@@ -146,11 +183,8 @@ for file_name in list_of_file_names:
     conditions_list = file_condition_dict[file_name]["conditions"]
     control_labelling = file_condition_dict[file_name]["control_labelling"]
     treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
-    #turbo_id_value_per_channel = pd.Series(file_turbo_id_dict[file_name])
     
-    #RAW
-    #plots for raw df
-    #message = pearson_corr_channels(df, file_name, folder_path, "Raw")
+    # RAW
     pca_fig_1 = get_pca_plot(df, "Raw")
     plot_list.append(pca_fig_1)
     
@@ -165,7 +199,7 @@ for file_name in list_of_file_names:
                 color = "green")
     
     
-    #MEDIAN OF MEDIANS TP only, 2+ peptides
+    # MEDIAN OF MEDIANS TP only, 2+ peptides
     norm_factor_series = []
     for condition in conditions_list:
         sub_df = get_condition_df(df, condition)
@@ -177,28 +211,32 @@ for file_name in list_of_file_names:
         sub_df = sub_df.reset_index()
         sub_df = sub_df[(sub_df["annotation"] == "TP") & (sub_df["pep_num"] >= 2)]
         sub_df = sub_df.sort_values(by=['median_ratio'], ascending=False)
-        #sub_df = sub_df.head(100)
         sub_df = sub_df.drop("median_"+condition+"_"+treatment_labelling, axis=1)
         sub_df = sub_df.drop("median_"+condition+"_"+control_labelling, axis=1)
         sub_df = sub_df.drop("median_ratio", axis=1)
         sub_df = sub_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
         sub_df = sub_df[cond_columns]
+        
         norm_factors = sub_df.median().median() / sub_df.median()
         norm_factor_series.append(norm_factors)
+
     norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
-    print(norm_factor)
+    logging.info("Normalization factors")
+    logging.info(norm_factor)
+
     normalized_df = df[norm_factor.index] * norm_factor
     list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
     untouched_ctrl_columns = df[list_of_ctrl_cols]
+    
     norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
     norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
-    norm_df = norm_df[df.columns] #get the same order of columns 
-    #print(len(norm_df) == len(df))
-    #print(norm_df.columns == df.columns)
+    norm_df = norm_df[df.columns] # get the same order of columns 
+    
+    assert len(norm_df) == len(df)
+    assert norm_df.columns.tolist() == df.columns.tolist()
 
-    #message = pearson_corr_channels(norm_df, file_name, folder_path, "Normalized")
-    pca_fig_6 = get_pca_plot(norm_df, "Median of medians TP only, 2+ peptides, Cre+")
-    plot_list.append(pca_fig_6)
+    pca_fig_2 = get_pca_plot(norm_df, "Median of medians TP only, 2+ peptides, Cre+")
+    plot_list.append(pca_fig_2)
     
     norm_df_log = np.log2(norm_df)
     norm_df_log.plot(kind='box', 
@@ -210,155 +248,97 @@ for file_name in list_of_file_names:
                      ylabel="log2(SI)", 
                      color = "darkblue")
     
-    #this is what gets passed into cutoff analysis
+    # this is what gets passed into cutoff analysis
     normalized_dict[file_name] = norm_df
     
-    fig.savefig(folder_path / (file_name+'box_plots.png'))
-    with open(folder_path / (file_name+'pca_plots.html') , 'w') as f:
+    fig.savefig(file_folder_path / ("box_plots_" + file_name + '.png'))
+    with open(file_folder_path / ("pca_plots_" + file_name + '.html'), 'w') as f:
         f.write(file_name)
         for fig in plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
 # %%
-#save normalized df in folder
-folder_path = output_folder_path / "04_normalised"
+# save normalized df in folder
+folder_path = output_folder_path / "04_normalized"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
 for file_name in list_of_file_names:
     df = normalized_dict[file_name]
-    print(len(df))
-    print("")
-    df.to_csv(folder_path / (file_name + ".csv"))
+    df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
 
+
+# %% 
+# split tissue and serum 
+folder_path = output_folder_path / "05_results"
+if not os.path.exists(folder_path):
+    os.mkdir(folder_path)
+
+tissue_folder_path = folder_path / "01_tissue"
+if not os.path.exists(tissue_folder_path):
+    os.mkdir(tissue_folder_path)
+
+serum_folder_path = folder_path / "02_serum"
+if not os.path.exists(serum_folder_path):
+    os.mkdir(serum_folder_path)
+
+for file_name in list_of_file_names:
+    # get data
+    df = normalized_dict[file_name]
+    conditions_list = file_condition_dict[file_name]["conditions"]
+    control_labelling = file_condition_dict[file_name]["control_labelling"]
+    treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
+    file_type = file_condition_dict[file_name]["file_type"]
+    cutoff_dict = {}
+    
+    if file_type == "serum": 
+        serum_file_folder_path = serum_folder_path / file_name.split("processed_census-out_")[1]
+        if not os.path.exists(serum_file_folder_path):
+            os.mkdir(serum_file_folder_path)
+        volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, serum_file_folder_path)
+        annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
+        annotated_protein_df.to_csv(serum_file_folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
+    
+    elif file_type == "tissue":
+        tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
+        if not os.path.exists(tissue_file_folder_path):
+            os.mkdir(tissue_file_folder_path)
+
+        cutoff_roc_path = tissue_file_folder_path / "01_cutoff_ROC_filter"
+        if not os.path.exists(cutoff_roc_path):
+            os.mkdir(cutoff_roc_path)
+        get_ratios_and_cutoffs(df, conditions_list, control_labelling, treatment_labelling, cutoff_roc_path, cutoff_dict, file_name, fasta_table)
+        break
+        #xx
 
 # %%
-#Cutoff analysis of all files
+# Cutoff analysis of all files
 folder_path = output_folder_path / "05_cutoff_analysis"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
     
-cutoff_dict = {}
+
 for file_name in list_of_file_names:
-    print(file_name)
+    logging.info("Starting cutoff analysis")
+    logging.info("Processing: %s", file_name)
     
-    #create output folder
-    folder_name = file_name.replace("processed_census-out_", "")
+    # create output folder
+    folder_name = file_name.split("processed_census-out_")[1]
     folder_path = output_folder_path / "05_cutoff_analysis" / folder_name
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
         
-    #get data
+    # get data
     df = normalized_dict[file_name]
-    #df = filtered_dict[file_name]
     conditions_list = file_condition_dict[file_name]["conditions"]
     control_labelling = file_condition_dict[file_name]["control_labelling"]
     treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
-    
-    #filtering and get ratio
-    ratio_dfs_dict = {}
 
-    for condition in conditions_list:
-        sub_df = get_condition_df(df, condition)
-        sub_df = sub_df.dropna() #this step important because we want to only take the ones in account which pass cond filtering
-        cond_columns = sub_df.filter(like=treatment_labelling).columns.tolist()
-        ctrl_columns = sub_df.filter(like=control_labelling).columns.tolist()
-        ratio_df = get_ratio_condition_df(sub_df, cond_columns, ctrl_columns)
-        ratio_dfs_dict[condition] = ratio_df
-        
-    ratio_tables = list(ratio_dfs_dict.values())
-    ratio_tables = [table.reset_index() for table in ratio_tables]
-    col_list = ['uniprot_id', 'description', 'pep_num', 'annotation']
-    ratio_tables_merged = reduce(lambda df1,df2: pd.merge(df1,df2,on=col_list, how="outer"), ratio_tables)
-    #merge with normalized SI
-    ratio_and_signal_intensity = ratio_tables_merged.merge(df, on=['uniprot_id', 'description', 'pep_num'], how='left')
-    
-    all_cond_full_tables = {}
-    all_cond_cutoff_tables = {}
-    
-    sub_cutoff_dict = {}
-    all_cond_cutoff_tables = get_cutoffs(ratio_dfs_dict, folder_path, all_cond_cutoff_tables, sub_cutoff_dict)
-    #break
-    cutoff_dict[file_name] = sub_cutoff_dict
-    
-    #For each replicate get number of proteins that pass cutoff
-    for condition, table_list in all_cond_cutoff_tables.items():
-        for table in table_list:
-            col_name = table.filter(like='log2_norm_ratio_').columns.tolist()
-            col_name = col_name[0]
-            col_name = col_name.replace("log2_norm_ratio_", "")
-            #total_TP = len(table[table["annotation"] == "TP"])
-            #total_FP = len(table[table["annotation"] == "FP"])
-            table.drop('TP', axis=1, inplace=True)
-            table.drop('FP', axis=1, inplace=True)
-            table.drop('TPR', axis=1, inplace=True)
-            table.drop('FPR', axis=1, inplace=True)
-            table.rename(columns={"pass_cutoff": "pass_cutoff_"+col_name,
-                                  "TPR-FPR": "TPR-FPR_"+col_name}, inplace=True)
-            
-    #Merge replicates of the same condition into one table and get everything in one table (outer merge)
-    merged_replicate_tables = []
-    for condition, table_list in all_cond_cutoff_tables.items():
-        df = reduce(lambda df1,df2: pd.merge(df1,df2,on=['uniprot_id', 'annotation'], how="outer"), table_list)
-        merged_replicate_tables.append(df)
-        #total_TP = len(df[df["annotation"] == "TP"])
-        #total_FP = len(df[df["annotation"] == "FP"])
-            
-    
-    #Merge cutoff ratio from all conditions in one file
-    df_all = reduce(lambda df1,df2: pd.merge(df1,df2,on=['uniprot_id', 'annotation'], how="outer"), merged_replicate_tables)
-    #df_all.to_csv(folder_path / ("log2_FPR_TPR.csv"), index=False)
-    
-    #merge ratio and signal intensity with cutoff values
-    ratio_and_signal_intensity.set_index(['uniprot_id', 'description', 'pep_num', 'annotation'], inplace=True)
-    
-    for condition in conditions_list:
-        ratio_condition_cols = ratio_and_signal_intensity.filter(like="ratio_"+condition).columns.tolist()
-        ratio_and_signal_intensity["median_R("+condition+")"] = ratio_and_signal_intensity[ratio_condition_cols].median(axis=1)
-    
-    column_list = ratio_and_signal_intensity.columns.tolist()
-    column_list = [colname for colname in column_list if "ratio" not in colname]
-    
-    for condition in conditions_list:
-        conditions_cols_pos = [colname for colname in column_list if condition+"_"+treatment_labelling in colname]
-        if len(conditions_cols_pos) == 0:
-            conditions_cols_pos = [colname for colname in column_list if condition+treatment_labelling in colname]
-        ratio_and_signal_intensity["median_SI("+condition+")"] = ratio_and_signal_intensity[conditions_cols_pos].median(axis=1)
 
-    ratio_and_signal_intensity = ratio_and_signal_intensity.reset_index()
-    
-    #merge 
-    df_all_list_columns_TPRFPR = df_all.filter(like="TPR-FPR").columns.tolist()
-    df_all_list_columns_passcutoff = df_all.filter(like="pass_cutoff").columns.tolist()
-
-    columns_list_df_all = df_all_list_columns_TPRFPR + df_all_list_columns_passcutoff
-    columns_list_df_all.append("uniprot_id")
-    
-    #reduced_fasta_table = fasta_table.drop(fasta_table.columns[[0,-10,-9,-8,-7,-6]], axis = 1)
-    
-    ratio_and_signal_intensity = ratio_and_signal_intensity.rename(columns={"uniprot_id": "Entry"})
-    ratio_and_signal_intensity.drop('description', axis=1, inplace=True)
-    fasta_table = fasta_table.rename(columns={"uniprot_id": "alias_uniprot_id"})
-
-    merged_with_metadata = pd.merge(ratio_and_signal_intensity, fasta_table, on=["Entry", "annotation"], how="left")
-    merged_with_metadata = merged_with_metadata.rename(columns={"Entry": "uniprot_id"})
-    merged_with_metadata = merged_with_metadata.drop_duplicates(subset='uniprot_id', keep='first')
-    
-    ratio_and_signal_intensity_merged = pd.merge(merged_with_metadata, df_all[columns_list_df_all],on=["uniprot_id"], how="outer")
-    
-    print(len(ratio_and_signal_intensity_merged))
-    print(len(df_all))
-    
-    print("")
-    ratio_and_signal_intensity_merged = add_pass_cutoff_analysis_to_df(ratio_and_signal_intensity_merged, df_all_list_columns_passcutoff)
-    
-    with pd.ExcelWriter(folder_path / (folder_name+'_results.xlsx')) as writer:
-        ratio_and_signal_intensity_merged.to_excel(writer, sheet_name='ratio_raw_values', index=False)
-        df_all.to_excel(writer, sheet_name='log2_norm_ratio', index=False)
 
 
 # %%
-#Analysis of Proteins that pass cutoff Filter (i.e. pass_cutoff_result=TRUE)
+# Read in created excel sheets 
 input_folder_path = output_folder_path / "05_cutoff_analysis" 
 list_of_dir_paths = list(input_folder_path.iterdir())
 
@@ -371,7 +351,8 @@ for directory in list_of_dir_paths:
             list_of_result_file_paths.append(file_path)
 
 # %%
-folder_path = output_folder_path / "06_results" 
+# Analysis of Proteins that pass cutoff Filter (i.e. pass_cutoff_result=TRUE)
+folder_path = output_folder_path / "07_min_2_cutoff_pass" 
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
@@ -450,7 +431,11 @@ for file_path in list_of_result_file_paths:
         sheet_2 = sheet_2.set_index(["uniprot_id", "annotation"])
         list_columns_passcutoff = sheet_2.filter(like="pass_cutoff").columns.tolist()
         
-        folder_path = output_folder_path / "06_results" / file_path.stem
+        folder_path = output_folder_path / "06_tp_fp_per_ratio" # / file_path.stem
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+
+        folder_path = output_folder_path / "06_tp_fp_per_ratio" / file_path.stem
         if not os.path.exists(folder_path):
             os.mkdir(folder_path)
             
@@ -556,7 +541,12 @@ for file_path in list_of_result_file_paths:
 # 
 
 # %%
-folder_path = output_folder_path / "06_results" 
+folder_path = output_folder_path / "07_min_2_cutoff_pass" 
+
+volcano_data_folder_path = folder_path / "volcano_plot_data"
+if not os.path.exists(volcano_data_folder_path):
+    os.mkdir(volcano_data_folder_path)
+
 volcano_plot_list_10plex = []
 volcano_plot_list_16plex = []
 
@@ -725,6 +715,8 @@ for file_path in list_of_result_file_paths:
             
                 volcano_plot_list_16plex.append(fig)
 
+    volcano_df.to_csv(volcano_data_folder_path / (title_name + ".csv"))              
+
 with open(folder_path / 'volcano_plots_10plex.html' , 'w') as f:
     for fig in volcano_plot_list_10plex:
         f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
@@ -736,3 +728,5 @@ with open(folder_path / 'volcano_plots_16plex.html' , 'w') as f:
 
 
 
+
+# %%
