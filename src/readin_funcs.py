@@ -21,7 +21,7 @@ def get_channel_name_dict(input_folder_path, list_of_file_names):
     #file_turbo_id_dict[file_name] = turboid_dict
 
     #save as dict as json file
-    with open("file_channel_details.json", "w") as outfile:
+    with open("../results/file_channel_details.json", "w") as outfile:
         json.dump(file_channel_dict, outfile)
     
     return(file_channel_dict)
@@ -44,7 +44,7 @@ def get_cond_info(input_folder_path, list_of_file_names):
         file_condition_dict[file_name] = condition_dict
     
     #save as dict as json file
-    with open("file_condition_details.json", "w") as outfile:
+    with open("../results/file_condition_details.json", "w") as outfile:
         json.dump(file_condition_dict, outfile)
     
     return(file_condition_dict)
