@@ -14,9 +14,6 @@ def get_detailed_protein_annotation(df, volcano_df, fasta_table):
     df = df.reset_index().set_index("uniprot_id")
     df = df.drop(["annotation", "description"], axis = 1)
 
-    volcano_df = volcano_df.reset_index().set_index("uniprot_id")
-    volcano_df = volcano_df.drop(["annotation", "description", "name", "pep_num"], axis = 1)
-
     annotated_df = pd.concat([df, volcano_df, fasta_table], axis=1)
     return annotated_df
 
@@ -30,7 +27,7 @@ def get_ratio_condition_df(sub_df, cond_columns, ctrl_columns):
 
 
 def get_cutoffs(ratio_dfs_dict, folder_path, all_cond_cutoff_tables, sub_cutoff_dict):
-    folder_path = folder_path / ('plots')
+    folder_path = folder_path / ('cutoff_roc_plots')
     if not os.path.exists(folder_path):
         os.mkdir(folder_path)
     for condition, table in ratio_dfs_dict.items():     
@@ -138,7 +135,9 @@ def add_pass_cutoff_analysis_to_df(ratio_and_signal_intensity_merged, df_all_lis
     col_list = new_df.columns.tolist()
     for col in col_list:
         new_df[col+"_min_2_cutoffs"] = new_df[col] >= 2
-    new_df["pass_cutoff_result"] = (new_df == True).any(axis=1)
+    
+    min_2_cutoffs_list = new_df.filter(like="_min_2_cutoffs").columns.tolist()
+    new_df["pass_cutoff_result"] = (new_df[min_2_cutoffs_list] == True).any(axis=1)
     new_df = new_df.reset_index()
     new_df = new_df.rename(columns={"uniprot":"uniprot_id"})
     ratio_and_signal_intensity_merged = ratio_and_signal_intensity_merged.reset_index()
@@ -234,6 +233,7 @@ def get_expr(row):
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
     volcano_plot_list = []
+    volcano_df_list = []
     if len(conditions_list) == 2: 
         list_columns_trt = df.filter(like=treatment_labelling).columns.tolist()
         trt_col_df = df[list_columns_trt]
@@ -283,6 +283,10 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
         fig.update_layout(legend=dict(title=""), title_x=0.5)
         volcano_plot_list.append(fig)
+        volcano_df = volcano_df.reset_index().set_index("uniprot_id")
+        volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
+        volcano_df = volcano_df.add_suffix("_"+title_name)
+        volcano_df_list.append(volcano_df)
         
     elif len(conditions_list) == 3: 
         list_columns_trt = df.filter(like=treatment_labelling).columns.tolist()
@@ -324,13 +328,13 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         for volcano_df in df_list:
             if "p_value_1" in volcano_df.columns:
                 x_axis_name = "log2(" + conditions_list[1] +"/" + conditions_list[0] +")"
-                title_name = file_name + " - " + conditions_list[1] +" vs. " + conditions_list[0] + " ("+ str(len(volcano_df)) + " Proteins)"
+                title_name = file_name.split("processed_census-out_")[1] + " - " + conditions_list[1] +" vs. " + conditions_list[0] + " ("+ str(len(volcano_df)) + " Proteins)"
             elif "p_value_2" in volcano_df.columns:
                 x_axis_name = "log2(" + conditions_list[2] +"/" + conditions_list[0] +")"
-                title_name = file_name + " - " + conditions_list[2] +" vs. " + conditions_list[0] + " ("+ str(len(volcano_df)) + " Proteins)"
+                title_name = file_name.split("processed_census-out_")[1] + " - " + conditions_list[2] +" vs. " + conditions_list[0] + " ("+ str(len(volcano_df)) + " Proteins)"
             elif "p_value_3" in volcano_df.columns:
                 x_axis_name = "log2(" + conditions_list[1] +"/" + conditions_list[2] +")"
-                title_name = file_name + " - " + conditions_list[1] +" vs. " + conditions_list[2] + " ("+ str(len(volcano_df)) + " Proteins)"
+                title_name = file_name.split("processed_census-out_")[1] + " - " + conditions_list[1] +" vs. " + conditions_list[2] + " ("+ str(len(volcano_df)) + " Proteins)"
             
             volcano_df.columns = ["p_value", "log2_FC"]
             volcano_df = volcano_df.dropna() 
@@ -359,13 +363,19 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
             fig.update_layout(legend=dict(title=""), title_x=0.5)
             volcano_plot_list.append(fig)
+            volcano_df = volcano_df.reset_index().set_index("uniprot_id")
+            volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
+            volcano_df = volcano_df.add_suffix("_"+title_name)
+            volcano_df_list.append(volcano_df)
 
 
     with open(folder_path / 'volcano_plots.html' , 'w') as f:
         for fig in volcano_plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+
+    volcano_df = pd.concat(volcano_df_list, axis=1)
             
-    return volcano_df 
+    return volcano_df
 
 
 def get_ratios_and_cutoffs(df, 
@@ -381,7 +391,7 @@ def get_ratios_and_cutoffs(df,
 
     for condition in conditions_list:
         sub_df = get_condition_df(df, condition)
-        sub_df = sub_df.dropna() # this step important because we want to only take the ones in account which pass cond filtering
+        sub_df = sub_df.dropna() 
         cond_columns = sub_df.filter(like=treatment_labelling).columns.tolist()
         ctrl_columns = sub_df.filter(like=control_labelling).columns.tolist()
         ratio_df = get_ratio_condition_df(sub_df, cond_columns, ctrl_columns)
@@ -394,9 +404,7 @@ def get_ratios_and_cutoffs(df,
     
     # merge with normalized SI
     ratio_and_signal_intensity = ratio_tables_merged.merge(df, on=['uniprot_id', 'description', 'pep_num'], how='left')
-    
-    #all_cond_full_tables = {}
-    
+        
     all_cond_cutoff_tables = {}
     sub_cutoff_dict = {}
     all_cond_cutoff_tables = get_cutoffs(ratio_dfs_dict, tissue_file_folder_path, all_cond_cutoff_tables, sub_cutoff_dict)
@@ -443,10 +451,10 @@ def get_ratios_and_cutoffs(df,
     ratio_and_signal_intensity = ratio_and_signal_intensity.reset_index()
     
     # merge 
-    df_all_list_columns_TPRFPR = df_all.filter(like="TPR-FPR").columns.tolist()
+    #df_all_list_columns_TPRFPR = df_all.filter(like="TPR-FPR").columns.tolist()
     df_all_list_columns_passcutoff = df_all.filter(like="pass_cutoff").columns.tolist()
 
-    columns_list_df_all = df_all_list_columns_TPRFPR + df_all_list_columns_passcutoff
+    columns_list_df_all = df_all_list_columns_passcutoff #df_all_list_columns_TPRFPR
     columns_list_df_all.append("uniprot_id")
         
     ratio_and_signal_intensity = ratio_and_signal_intensity.rename(columns={"uniprot_id": "Entry"})
@@ -465,9 +473,143 @@ def get_ratios_and_cutoffs(df,
     #print("")
     ratio_and_signal_intensity_merged = add_pass_cutoff_analysis_to_df(ratio_and_signal_intensity_merged, df_all_list_columns_passcutoff)
     
-    with pd.ExcelWriter(tissue_file_folder_path / 'decision_table_' + file_name.split("processed_census-out")[1] + '.xlsx') as writer:
-        ratio_and_signal_intensity_merged.to_excel(writer, sheet_name='ratio_raw_values', index=False)
-        df_all.to_excel(writer, sheet_name='log2_norm_ratio', index=False)
+    with pd.ExcelWriter(tissue_file_folder_path / ('decision_table' + file_name.split("processed_census-out")[1] + '.xlsx')) as writer:
+        ratio_and_signal_intensity_merged.to_excel(writer, sheet_name='ratio_normSI_annot', index=False)
+        df_all.to_excel(writer, sheet_name='cutoff_plots_data', index=False)
     
-    return "done"
+    return ratio_and_signal_intensity_merged, df_all
 
+
+def get_before_after_cutoff_barplots(decision_table, pass_cutoff_path, file_name):
+    pass_cutoff_true_df = decision_table[decision_table.pass_cutoff_result == True]   
+    pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
+    pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
+    #pass_cutoff_true_df = pass_cutoff_true_df.reset_index()
+
+    barplot_list = []
+    total = len(pass_cutoff_true_df)
+    tp_num = len(pass_cutoff_true_df[pass_cutoff_true_df["annotation"] == "TP"])
+    fp_num = len(pass_cutoff_true_df[pass_cutoff_true_df["annotation"] == "FP"])
+    na_num = len(pass_cutoff_true_df[pass_cutoff_true_df["annotation"].isnull()])
+    pass_cutoff_true_df_list = ["pass cutoff 2 \n ("+ str(total)+" proteins)", (tp_num/total)*100, (fp_num/total)*100, (na_num/total)*100]
+        
+    list_columns_ratio = decision_table.filter(like="ratio_").columns.tolist()
+    decision_table = decision_table.set_index(["uniprot_id", "annotation"])
+    decision_table = decision_table[list_columns_ratio].dropna()
+    decision_table = decision_table.reset_index()
+    #sheet_1 = sheet_1[["uniprot", "annotation"]]
+    total = len(decision_table)
+    tp_num = len(decision_table[decision_table["annotation"] == "TP"])
+    fp_num = len(decision_table[decision_table["annotation"] == "FP"])
+    na_num = len(decision_table[decision_table["annotation"].isnull()])
+    all_proteins = ["all \n ("+ str(total)+" proteins)", (tp_num/total)*100, (fp_num/total)*100, (na_num/total)*100]
+        
+    barplot_list.append(all_proteins)
+    barplot_list.append(pass_cutoff_true_df_list)
+
+    # Create the pandas DataFrame
+    df = pd.DataFrame(barplot_list, columns=['state', 'True positives', 'False positives', 'Not annotated'])
+    df = df.set_index("state")
+    df.plot(kind='bar', stacked=True, color=['green','red','lightgrey'])
+    plt.xlabel('')
+    plt.ylabel("% Proteins")
+    plt.title(file_name.split("processed_census-out")[1] + " 2 pass cutoff")
+    plt.xticks(rotation = 0) 
+    #plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.savefig(pass_cutoff_path / (file_name.split("processed_census-out_")[1] +'_barplot.png'))
+    plt.show()
+        
+    return pass_cutoff_true_df
+
+def get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutoff_dict):
+    sheet_2 = cutoff_plots_table.set_index(["uniprot_id", "annotation"])
+    list_columns_passcutoff = sheet_2.filter(like="pass_cutoff").columns.tolist()
+        
+    folder_path = cutoff_roc_path / "tp_fp_plots"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    for col in list_columns_passcutoff:
+        df_list = []
+        col_clean = col.replace("pass_cutoff_", "")
+        
+        for file, cutoff_vals in cutoff_dict.items():
+            if file_name in file:
+                cutoff_value = cutoff_vals[col_clean]
+                cutoff_value = round(cutoff_value, 3)   
+            
+        sub_df_cols = sheet_2.filter(like=col_clean).columns.tolist()
+        sub_df = sheet_2[sub_df_cols]
+        sub_df = sub_df.dropna(subset=["log2_norm_ratio_"+col_clean])
+        sub_df = sub_df.reset_index()
+        sub_df = sub_df.set_index("uniprot_id")
+        sub_df_plot = sub_df[["log2_norm_ratio_"+col_clean, "annotation"]]
+        TP = sub_df_plot[sub_df_plot["annotation"] == "TP"].drop("annotation", axis=1).iloc[:, 0].rename("TP")
+        FP = sub_df_plot[sub_df_plot["annotation"] == "FP"].drop("annotation", axis=1).iloc[:, 0].rename("FP")
+        no_val = sub_df_plot[sub_df_plot["annotation"].isnull()].drop("annotation", axis=1).iloc[:, 0].rename("NA")
+        all_list = ["all \n ("+ str(len(sub_df_plot))+" proteins)", (len(TP)/len(sub_df_plot))*100, (len(FP)/len(sub_df_plot))*100, (len(no_val)/len(sub_df_plot))*100]
+        df_list.append(all_list)
+        
+        df_to_plot = pd.concat([TP,FP, no_val],axis=1)
+        gfg = sns.histplot(df_to_plot,
+                           palette=dict(TP="green", FP="red", NA="grey"))
+        plt.axvline(cutoff_value, 0, color="black", linewidth=0.5, linestyle='dashed')
+        #plt.text(cutoff_value+1, 100, "Cutoff: "+str(cutoff_value))
+        gfg.set(xlabel ="log2("+col_clean+")", title = file_name + "\n" + col_clean + " Cutoff: "+str(cutoff_value))
+        plt.show()
+        fig = gfg.get_figure()
+        description = col_clean.replace("/", "_")
+        fig.savefig(folder_path / (description+'hist_1.png')) 
+        
+        df_to_plot = pd.concat([TP,FP],axis=1)
+        gfg_2 = sns.histplot(df_to_plot, 
+                             palette=dict(TP="green", FP="red"))
+        plt.axvline(cutoff_value, 0, color="black", linewidth=0.5, linestyle='dashed')
+        #plt.text(cutoff_value+1, 60, "Cutoff: "+str(cutoff_value))
+        gfg_2.set(xlabel ="log2("+col_clean+")", title = file_name + "\n" + col_clean + " Cutoff: "+str(cutoff_value))
+        plt.show()
+        fig = gfg_2.get_figure()
+        description = col_clean.replace("/", "_")
+        fig.savefig(folder_path / (description+'hist_2.png')) 
+    
+        
+        only_pass_cutoff = sub_df[sub_df[col] == 1]
+        total = len(only_pass_cutoff)
+        tp_num = len(only_pass_cutoff[only_pass_cutoff["annotation"] == "TP"])
+        fp_num = len(only_pass_cutoff[only_pass_cutoff["annotation"] == "FP"])
+        na_num = len(only_pass_cutoff[only_pass_cutoff["annotation"].isnull()])
+                
+        if total != 0:
+            pass_cutoff_list = ["pass cutoff \n("+ str(total)+" proteins)", (tp_num/total)*100, (fp_num/total)*100, (na_num/total)*100]
+        elif total == 0:
+            pass_cutoff_list = ["pass cutoff \n("+ str(total)+" proteins)", 0, 0, 0]
+                
+        df_list.append(pass_cutoff_list)
+        
+        only_notpass_cutoff = sub_df[sub_df[col] == 0]
+        total = len(only_notpass_cutoff)
+        tp_num = len(only_notpass_cutoff[only_notpass_cutoff["annotation"] == "TP"])
+        fp_num = len(only_notpass_cutoff[only_notpass_cutoff["annotation"] == "FP"])
+        na_num = len(only_notpass_cutoff[only_notpass_cutoff["annotation"].isnull()])
+                
+        if total != 0:
+            only_notpass_cutoff_list = ["not pass cutoff \n ("+ str(total)+" proteins)", (tp_num/total)*100, (fp_num/total)*100, (na_num/total)*100]
+        elif total == 0:
+            only_notpass_cutoff_list = ["not pass cutoff \n ("+ str(total)+" proteins)", 0, 0, 0]
+
+        df_list.append(only_notpass_cutoff_list)
+        
+        # Create the pandas DataFrame
+        df = pd.DataFrame(df_list, columns=['state', 'True positives', 'False positives', 'Not annotated'])
+        df = df.set_index("state")
+        df.plot(kind='bar', stacked=True, color=['green','red','lightgrey'])
+        plt.xlabel('')
+        plt.ylabel("% Proteins")
+        plt.title(file_name + "\n" + col_clean)
+        plt.xticks(rotation = 0) 
+        #plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+        description = col_clean.replace("/", "_")
+        plt.savefig(folder_path / (description+'barplot.png'))
+        plt.show()   
+    
+    return "done"            
