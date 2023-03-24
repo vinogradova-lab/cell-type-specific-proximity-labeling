@@ -513,7 +513,7 @@ def get_before_after_cutoff_barplots(decision_table, pass_cutoff_path, file_name
     df.plot(kind='bar', stacked=True, color=['green','red','lightgrey'])
     plt.xlabel('')
     plt.ylabel("% Proteins")
-    plt.title(file_name.split("processed_census-out")[1] + " 2 pass cutoff")
+    plt.title(file_name.split("processed_census-out_")[1] + " 2 pass cutoff")
     plt.xticks(rotation = 0) 
     #plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.savefig(pass_cutoff_path / (file_name.split("processed_census-out_")[1] +'_barplot.png'))
