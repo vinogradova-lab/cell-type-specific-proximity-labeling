@@ -298,7 +298,7 @@ for file_name in list_of_file_names:
         volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, serum_file_folder_path)
         annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
         annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
-        break
+
     elif file_type == "tissue":
         tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
         if not os.path.exists(tissue_file_folder_path):
@@ -319,12 +319,3 @@ for file_name in list_of_file_names:
         pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
         pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
 
-        break
-        #xx
-
-
-# %% 
-
-pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
-pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
-# %%
