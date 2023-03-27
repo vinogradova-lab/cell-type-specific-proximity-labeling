@@ -16,6 +16,8 @@ from src.filter_funcs import *
 from src.norm_funcs import *
 from src.readin_funcs import *
 import logging
+%load_ext autoreload
+%autoreload 2
 
 # %% 
 # read in paths from json
@@ -23,12 +25,13 @@ with open('paths.json') as paths_file:
     file_contents = paths_file.read()
 
 paths_json = json.loads(file_contents)
+paths_dict = paths_json["turbo_id_analysis_pipeline_paths"]
 
 # %%
 # paths % configs 
-input_folder_path = Path(paths_json['input_folder_path'])
-output_folder_path = Path(paths_json['output_folder_path'])
-fasta_table_path = Path(paths_json['fasta_table_path'])
+input_folder_path = Path(paths_dict['input_folder_path'])
+output_folder_path = Path(paths_dict['output_folder_path'])
+fasta_table_path = Path(paths_dict['fasta_table_path'])
 logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', filemode='w', encoding='utf-8', level=logging.INFO)
 
 # %%
@@ -41,7 +44,7 @@ logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
 logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
 
 assert len(TP_list) == 2806
-assert len(FP_list) == 1077
+assert len(FP_list) == 435
 
 # %%
 # Get list of files, file_channel_dict and cond_dict of processed census-out files

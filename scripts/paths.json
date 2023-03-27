@@ -1,5 +1,17 @@
 {
-    "input_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/11_files_turbo_id_1pepperprotein_03062023/01_processed_files/",
-    "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/032423_results/min_1_pep_per_protein",
-    "fasta_table_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/02_mouse_TP_FP_table/main_fasta_table.csv"
+    "turbo_id_analysis_pipeline_paths":
+    {
+        "input_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/11_files_turbo_id_1pepperprotein_03062023/01_processed_files/",
+        "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/032723_results/min_1_pep_per_protein",
+        "fasta_table_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/02_mouse_TP_FP_table/main_fasta_table.csv"
+    },
+    "mouse_fasta_to_FP_TP_tables_paths":
+    {
+        "mouse_fasta_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/fasta_files/radus_database__cravattlab_mouse_nonredundant_07-11-2017_reversed.fasta",
+        "tissue_localisation_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Reference datasets/Mouse/Tissue localisation",
+        "uniprot_id_mapping_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/02_after_uniprot_mapping/mouse_mapping_uniprot-download_true_fields_accession_2Creviewed_2Cid_2Cprotein_nam-2022.08.31-15.17.09.71.csv",
+        "mitomatrix_protein_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/NIHMS552295-supplement-Supplementary_Data_1.csv",
+        "mart_export_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/mart_export(8).txt",
+        "output_folder_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table"
+    }
 }
