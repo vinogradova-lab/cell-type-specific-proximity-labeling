@@ -20,8 +20,8 @@ Files were processed with the Vinogradova Lab pipeline and were treated as “wh
   - use uniprot.org to get all annotations for these proteins
   - label proteins as TP based on following criteria in subcellular location column: 
     - "Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"
-  - label proteins as FP if uniprot id is found in human mitomatrix list from supplementary table S1 (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3916822/)
-    - obtain human-mouse gene orthologs by following tutorial: https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/
+  - label proteins as FP if uniprot id is found in human mitomatrix list from supplementary table S1 [Rhee et al. 2013](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3916822/)
+    - obtain human-mouse gene orthologs by following tutorial: [How to get all the orthologous genes between two species](https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/) 
     - this allows us to get the correct mouse gene names which correspond to the mitomatrix protein list, we then crossreference our fasta table and label them as FP
   - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation, also if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
@@ -69,7 +69,7 @@ Files were processed with the Vinogradova Lab pipeline and were treated as “wh
 Ad volcano plots: p-values were calculated with T-test for the means of two independent samples and volcano plots show uncorrected p-values. Significant proteins which show a > 1.5 fold change are highlighted in either red or green. 
 
 ### Details Cutoff ROC analysis 
-Following the approach of: https://www.nature.com/articles/s41596-020-0399-0
+Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41596-020-0399-0)
 
 1. Calculate Ratios per condition (example of one condition) 
    - Each condition within each file was analyzed on its own, therefore each condition will have its own cutoff in the end. 
