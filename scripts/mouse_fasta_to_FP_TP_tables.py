@@ -11,7 +11,6 @@ from src.fasta_table_funcs import *
 %load_ext autoreload
 %autoreload 2
 
-
 # %% 
 with open('paths.json') as paths_file:
     file_contents = paths_file.read()
@@ -24,6 +23,8 @@ paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
 mouse_fasta_path = Path(paths_dict['mouse_fasta_path']) 
 tissue_localisation_path = Path(paths_dict['tissue_localisation_path']) 
 mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path']) 
+mitomatrix_mouse_ortholog_path = Path(paths_dict['mitomatrix_mouse_ortholog_path']) 
+mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
 
 # %%
@@ -78,6 +79,7 @@ duplicates_list = merged_main_fasta_table[merged_main_fasta_table.index.duplicat
 duplicates_df = merged_main_fasta_table[merged_main_fasta_table.index.isin(duplicates_list)]
 deduplicated_entries = duplicates_df.groupby("uniprot_id").agg(list) #.reset_index()
 deduplicated_entries = deduplicated_entries.apply(remove_duplicates_from_aggregate, axis=1)
+deduplicated_entries["Gene Names"] = deduplicated_entries["Gene Names"].str.replace(",", "")
 
 merged_main_fasta_table = merged_main_fasta_table.drop(index=duplicates_list)
 merged_main_fasta_table = pd.concat([merged_main_fasta_table, deduplicated_entries])
@@ -90,17 +92,33 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 # %% 
 # read in mitomatrix gene names - mitomatrix table is human, we work with mouse so we crossreference by gene name  
 mitomatrix_df = pd.read_csv(mitomatrix_protein_path)
-mitomatrix_col_list = mitomatrix_df["Gene Names"].tolist()
-mitomatrix_nested_list = [uniprot_string.split(";") for uniprot_string in mitomatrix_col_list]
-mitomatrix_gene_list = reduce(concat, mitomatrix_nested_list)
-print("Number of human mitomatrix genes to crossreference with fasta table (includes alias names):", len(mitomatrix_gene_list))
+mitomatrix_df['Gene Names'] = mitomatrix_df['Gene Names'].apply(lambda x: x.split(";"))
+mitomatrix_df = mitomatrix_df.explode("Gene Names")
+mitomatrix_df = mitomatrix_df.rename(columns={"Gene Names":"Gene name"})
+mitomatrix_df.head()
+
+# we need to becareful when crossreferencing by gene names
+# https://www.biostars.org/p/149115/
+# https://pypi.org/project/mousipy/
+# https://bioinformatics.stackexchange.com/questions/17486/converting-mouse-genes-to-human-genes
+
+
+# %%
+# follow https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/ turotial and read in results
+mart_human_mouse_orthologs = pd.read_csv(mart_export_path)
+
+# %% 
+# merge mart results to get mouse gene list 
+mitomatrix_mart_merge_df = mitomatrix_df.merge(mart_human_mouse_orthologs, how="left", on="Gene name")
+mouse_mitomatrix_genes_list = mitomatrix_mart_merge_df["Mouse gene name"].tolist()
 
 # %%
 # annotate TP and FP
 # merged_main_fasta_table = merged_main_fasta_table.reset_index()
 merged_main_fasta_table["TP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_TP) 
 # merged_main_fasta_table["FP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_FP) 
-merged_main_fasta_table["FP"] = merged_main_fasta_table["Gene Names"].apply(annotate_FP_mitomatrix, args=(mitomatrix_gene_list, )) 
+list_of_found_genes = []
+merged_main_fasta_table["FP"] = merged_main_fasta_table["Gene Names"].apply(annotate_FP_mitomatrix, args=(mouse_mitomatrix_genes_list, )) 
 print(merged_main_fasta_table["TP"].value_counts())
 print(merged_main_fasta_table["FP"].value_counts())
 

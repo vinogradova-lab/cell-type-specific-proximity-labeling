@@ -27,12 +27,12 @@ def annotate_FP_subcellular_loc(subcelullar_location):
     for item in fp_term_list: 
         if item in subcelullar_location:
             return "FP" 
+            
 
 def annotate_FP_mitomatrix(gene_names, mitomatrix_list):
-    gene_names = str(gene_names).upper()
-    gene_name_list = gene_names.split(',')
+    gene_name_list = str(gene_names).split(' ')
     for gene in gene_name_list:
-        if gene_names in mitomatrix_list:
+        if gene in mitomatrix_list:
             return "FP"
 
 def conclude_annotation(df):   
