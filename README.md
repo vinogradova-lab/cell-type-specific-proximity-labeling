@@ -18,14 +18,14 @@ Files were processed with the Vinogradova Lab pipeline and were treated as “wh
 - create main table (based off of our mouse fasta file used for IP2 search)
   - read in fasta file to get all uniprot IDs
   - use uniprot.org to get all annotations for these proteins
-  - label them as TP or FP based on following criteria in subcellular location column: 
-    - **TP**: "Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"
-    - **FP**: "Mitochondrion", "mitochondrion"
-    - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation 
+  - label proteins as TP based on following criteria in subcellular location column: 
+    - "Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"
+  - label proteins as FP if gene name is found in human mitomatrix list from supplementary table S1 (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3916822/)
+  - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation, also if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
   - save table
   - Number of TP proteins: 2806
-  - Number of FP proteins: 1077
+  - Number of FP proteins: 261
 
 
 ### **Step 3 (turboid_analysis_pipeline.py)**

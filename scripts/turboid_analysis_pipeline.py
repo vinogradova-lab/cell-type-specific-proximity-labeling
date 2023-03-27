@@ -16,6 +16,8 @@ from src.filter_funcs import *
 from src.norm_funcs import *
 from src.readin_funcs import *
 import logging
+%load_ext autoreload
+%autoreload 2
 
 # %% 
 # read in paths from json

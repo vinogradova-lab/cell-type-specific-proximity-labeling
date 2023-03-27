@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 def remove_duplicates_from_aggregate(row): 
     list_of_cols = row.index.tolist()
     for col in list_of_cols: 
@@ -14,10 +17,10 @@ def annotate_TP(subcelullar_location):
     for item in tp_term_list: 
         if item in subcelullar_location:
             return "TP" 
-    
+   
 
-def annotate_FP(subcelullar_location):
-    fp_term_list = ["Mitochondrion", "mitochondrion"] # 'cytoskeleton' "Cytoskeleton", "Nucleus", "nucleus", 
+def annotate_FP_subcellular_loc(subcelullar_location):
+    fp_term_list = ["Mitochondrion", "mitochondrion"] # removed: 'cytoskeleton' "Cytoskeleton", "Nucleus", "nucleus", 
     subcelullar_location = str(subcelullar_location)
     if "Note:" in subcelullar_location:
         subcelullar_location = subcelullar_location.split("Note:")[0]
@@ -25,8 +28,14 @@ def annotate_FP(subcelullar_location):
         if item in subcelullar_location:
             return "FP" 
 
+def annotate_FP_mitomatrix(gene_names, mitomatrix_list):
+    gene_names = str(gene_names).upper()
+    gene_name_list = gene_names.split(',')
+    for gene in gene_name_list:
+        if gene_names in mitomatrix_list:
+            return "FP"
 
-def annotation(df):   
+def conclude_annotation(df):   
     if df["TP"] == "TP":
         return "TP" 
     # if signal peptide is present then even though annotation says FP, change annotation to nan
