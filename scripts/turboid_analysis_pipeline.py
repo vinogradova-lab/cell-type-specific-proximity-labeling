@@ -44,7 +44,7 @@ logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
 logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
 
 assert len(TP_list) == 2806
-assert len(FP_list) == 261
+assert len(FP_list) == 435
 
 # %%
 # Get list of files, file_channel_dict and cond_dict of processed census-out files
