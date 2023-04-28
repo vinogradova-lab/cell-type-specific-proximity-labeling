@@ -234,22 +234,24 @@ def get_expr(row):
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
     volcano_plot_list = []
     volcano_df_list = []
-    if len(conditions_list) == 2: 
+    if len(conditions_list) == 2:
         list_columns_trt = df.filter(like=treatment_labelling).columns.tolist()
         trt_col_df = df[list_columns_trt]
-    
         list_cond_1 = trt_col_df.filter(like=conditions_list[0]).columns.tolist()
         list_cond_2 = trt_col_df.filter(like=conditions_list[1]).columns.tolist()
-        idx_cond_1 = trt_col_df.columns.get_indexer(list_cond_1)
-        idx_cond_2 = trt_col_df.columns.get_indexer(list_cond_2)
-        trt_col_df["p_value"] = trt_col_df.apply(get_p_value, axis=1, args=(idx_cond_1, idx_cond_2), )
 
         for condition in conditions_list:
             list_columns_cond = trt_col_df.filter(like=condition).columns.tolist()
             cond_df = trt_col_df[list_columns_cond]
             trt_col_df["mean_"+condition+"_"+treatment_labelling] = cond_df.mean(axis=1)
-    
+            
         trt_col_df["FC"] = trt_col_df["mean_"+conditions_list[0]+"_"+treatment_labelling] / trt_col_df["mean_"+conditions_list[1]+"_"+treatment_labelling]
+        x_axis_name = "log2(" + conditions_list[0] +"/" + conditions_list[1] +")"
+    
+        idx_cond_1 = trt_col_df.columns.get_indexer(list_cond_1)
+        idx_cond_2 = trt_col_df.columns.get_indexer(list_cond_2)
+        trt_col_df["p_value"] = trt_col_df.apply(get_p_value, axis=1, args=(idx_cond_1, idx_cond_2), )
+        
         trt_col_df["log2_FC"] = np.log2(trt_col_df["FC"])
         volcano_df = trt_col_df[["p_value", "log2_FC"]]
             
@@ -258,21 +260,21 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         volcano_df["Regulation"] = volcano_df.apply(get_expr, axis=1)
             
         volcano_df["Regulation"] = volcano_df["Regulation"].astype('category')
-        my_order = ["Down", "Stable", "Up"]
-        volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
-
+        
         volcano_df = volcano_df.reset_index()
         volcano_df = volcano_df.set_index(["annotation"])
         volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
-        
-        x_axis_name = "log2(" + conditions_list[0] +"/" + conditions_list[1] +")"
+
         title_name = file_name + " - " + conditions_list[0] +" vs. " + conditions_list[1] + " ("+ str(len(volcano_df)) + " Proteins)"
+        my_order = ["Down", "Stable", "Up"]
+        volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
+        colors_volcano = ["red", 'grey', 'green']
 
         fig = px.scatter(volcano_df, 
                          x='log2_FC', 
                          y='-log10_pval',
                          color='Regulation',
-                         color_discrete_sequence=["red", 'grey', 'green'],
+                         color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
                          title = title_name,
                          labels = {"log2_FC": x_axis_name},
@@ -368,7 +370,80 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             volcano_df = volcano_df.add_suffix("_"+title_name)
             volcano_df_list.append(volcano_df)
 
+    with open(folder_path / 'volcano_plots.html' , 'w') as f:
+        for fig in volcano_plot_list:
+            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
+    volcano_df = pd.concat(volcano_df_list, axis=1)
+            
+    return volcano_df
+
+def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
+    volcano_plot_list = []
+    volcano_df_list = []
+
+    for condition in conditions_list:
+        cond_cols_df = df.filter(like=condition)
+        list_cond_1 = cond_cols_df.filter(like=treatment_labelling).columns.tolist()
+        list_cond_2 = cond_cols_df.filter(like=control_labelling).columns.tolist()
+        if len(list_cond_1) <= 1 or len(list_cond_2) <= 1:
+            print(f"Condition {condition} does not have enough replicates to be shown in volcano plot!")
+            print(list_cond_1)
+            print(list_cond_2)
+            continue
+
+        for labelling in [control_labelling, treatment_labelling]:
+            list_columns_labelling = cond_cols_df.filter(like=labelling).columns.tolist()
+            labelling_df = cond_cols_df[list_columns_labelling]
+            cond_cols_df["mean_"+condition+"_"+labelling] = labelling_df.mean(axis=1)
+            
+        cond_cols_df["FC"] = cond_cols_df["mean_"+condition+"_"+treatment_labelling] / cond_cols_df["mean_"+condition+"_"+control_labelling]
+        x_axis_name = "log2(" + condition + "_" + treatment_labelling + "/" + condition + "_" + control_labelling + ")"
+
+        idx_cond_1 = cond_cols_df.columns.get_indexer(list_cond_1)
+        idx_cond_2 = cond_cols_df.columns.get_indexer(list_cond_2)
+        cond_cols_df["p_value"] = cond_cols_df.apply(get_p_value, axis=1, args=(idx_cond_1, idx_cond_2), )
+        
+        cond_cols_df["log2_FC"] = np.log2(cond_cols_df["FC"])
+        volcano_df = cond_cols_df[["p_value", "log2_FC"]]
+            
+        volcano_df = volcano_df.dropna() 
+        volcano_df["-log10_pval"] = -1*np.log10(volcano_df["p_value"])
+        volcano_df["Regulation"] = volcano_df.apply(get_expr, axis=1)
+            
+        volcano_df["Regulation"] = volcano_df["Regulation"].astype('category')
+        
+        volcano_df = volcano_df.reset_index()
+        volcano_df = volcano_df.set_index(["annotation"])
+        volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
+
+        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + condition + "_" + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
+        #my_order = ["Down", "Stable", "Up"]
+        my_order = ["Stable", "Up"]
+        volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
+        colors_volcano = ['grey', 'green']
+        #colors_volcano = ["red", 'grey', 'green']
+    
+        fig = px.scatter(volcano_df, 
+                         x='log2_FC', 
+                         y='-log10_pval',
+                         color='Regulation',
+                         color_discrete_sequence=colors_volcano,
+                         hover_data=['name', 'uniprot_id'],
+                         title = title_name,
+                         labels = {"log2_FC": x_axis_name},
+                         template = "simple_white",
+                         category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
+        fig.add_vline(x=0.58, line_width=2, line_dash="dash", line_color="grey")
+        fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
+        fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
+        fig.update_layout(legend=dict(title=""), title_x=0.5)
+        volcano_plot_list.append(fig)
+        volcano_df = volcano_df.reset_index().set_index("uniprot_id")
+        volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
+        volcano_df = volcano_df.add_suffix("_"+title_name)
+        volcano_df_list.append(volcano_df)
+        
     with open(folder_path / 'volcano_plots.html' , 'w') as f:
         for fig in volcano_plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))

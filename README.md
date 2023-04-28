@@ -34,6 +34,9 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
 
 ### **Step 3 (turboid_analysis_pipeline.py)**
 
+  - `conda activate turbo_id_notebook`
+  - `python turboid_analysis_pipeline.py` (in tuboid/scripts folder)
+
   - read in data and metadata 
   
 **01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated**
@@ -107,3 +110,10 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
      - “norm_ratio_” columns: normalized ratio (same as above but without log2) 
      - “TPR-FPR” columns: True positive rate – False positive rate for this protein (y axis in line plot)
      - “pass_cutoff” columns: 1/0  = passed cutoff/did not pass cutoff
+
+
+Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M
+- condition scheme does not match other files so needed to make follwing changes: 
+  - filtering is done on all 3 cre+ channels ie if 2 pass then protein passes 
+  - Cre(-)_Ctrl_W6 is the control for all Cre(+) samples 
+  - since there are no replicates - cannot create volcano plots for this condition as well as can't compare to BAT (the other condition in this file) - therefore, creating scatterplots to comapre fold change for this condition and a volcano plot for BAT cre+ / cre- 

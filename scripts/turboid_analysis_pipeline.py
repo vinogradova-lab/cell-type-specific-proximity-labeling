@@ -288,7 +288,7 @@ serum_folder_path = folder_path / "02_serum"
 if not os.path.exists(serum_folder_path):
     os.mkdir(serum_folder_path)
 
-for file_name in list_of_file_names:
+for file_name in list_of_file_names[3:4]:
     # get data
     df = normalized_dict[file_name]
     conditions_list = file_condition_dict[file_name]["conditions"]
@@ -319,7 +319,11 @@ for file_name in list_of_file_names:
         pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
         
         pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
-        volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
+        
+        if file_name == "processed_census-out_04172023_CRW_A-5_16pl_M":
+            volcano_df = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
+        else: 
+            volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
         
         pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
         pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
