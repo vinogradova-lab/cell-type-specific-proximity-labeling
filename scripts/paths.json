@@ -1,8 +1,8 @@
 {
     "turbo_id_analysis_pipeline_paths":
     {
-        "input_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/11_files_turbo_id_1pepperprotein_03062023/01_processed_files/",
-        "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/032723_results/min_1_pep_per_protein",
+        "input_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/12_files_turbo_id_1pepperprotein_042823/01_processed_files/",
+        "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/042823_results/min_1_pep_per_protein",
         "fasta_table_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/02_mouse_TP_FP_table/main_fasta_table.csv"
     },
     "mouse_fasta_to_FP_TP_tables_paths":
