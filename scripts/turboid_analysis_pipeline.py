@@ -17,6 +17,8 @@ from src.norm_funcs import *
 from src.readin_funcs import *
 import logging
 import subprocess 
+import warnings 
+warnings.filterwarnings('ignore')
 %load_ext autoreload
 %autoreload 2
 
@@ -288,7 +290,7 @@ serum_folder_path = folder_path / "02_serum"
 if not os.path.exists(serum_folder_path):
     os.mkdir(serum_folder_path)
 
-for file_name in list_of_file_names[3:4]:
+for file_name in list_of_file_names:
     # get data
     df = normalized_dict[file_name]
     conditions_list = file_condition_dict[file_name]["conditions"]
@@ -319,15 +321,34 @@ for file_name in list_of_file_names[3:4]:
         pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
         
         pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
-        
+        pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
+
         if file_name == "processed_census-out_04172023_CRW_A-5_16pl_M":
             volcano_df = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
+            pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
+            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("BAT_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
+
+            pass_cutoff_true_df = decision_table[decision_table[['GFAP_brain_Cre(+)_Ctrl_pass_cutoff_sum', 'GFAP_brain_Cre(+)_Fast_pass_cutoff_sum', 'GFAP_brain_Cre(+)_LPS_pass_cutoff_sum']].sum(axis=1) >= 1]
+            pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
+            pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
+            pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
+
+            #get scatterplots comaprisons: W7 vs W6, W8 vs W7, W9 vs W7, and W8 vs W9
+            pass_cutoff_true_df = pass_cutoff_true_df.set_index("entry_name")
+            df_scat_1 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W8")
+            df_scat_2 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W9")
+            df_scat_3 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W8_vs_W9")
+
+            scat_list = [df_scat_1, df_scat_2, df_scat_3]
+            scat_df = pd.concat(scat_list, axis=1)
+            
+            pass_cutoff_true_df = pass_cutoff_true_df.join(scat_df)
+            #pass_cutoff_true_df = pass_cutoff_true_df.drop(["pep_num", "annotation"], axis=1)
+            pass_cutoff_true_df = pass_cutoff_true_df.reset_index().set_index(["uniprot_id", "description", "pep_num", "annotation"])
+            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("GFAP_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
         else: 
             volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
-        
-        pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
-        pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
-        pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
-
+            pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
+            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
 
 # %%

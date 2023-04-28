@@ -113,7 +113,8 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
 
 
 Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M
-- condition scheme does not match other files so needed to make follwing changes: 
-  - filtering is done on all 3 cre+ channels ie if 2 pass then protein passes 
+- condition scheme does not match other files so needed to make follwing changes for GFAP condition: 
+  - cre+ filtering is done on all 3 cre+ channels (ctrl, fast, LPS) if at least 2 pass sum and cv then protein passes
   - Cre(-)_Ctrl_W6 is the control for all Cre(+) samples 
-  - since there are no replicates - cannot create volcano plots for this condition as well as can't compare to BAT (the other condition in this file) - therefore, creating scatterplots to comapre fold change for this condition and a volcano plot for BAT cre+ / cre- 
+  - because the goal is not to compare GFAP to BAT - need to split final protein table and filter individually to get the final protein list
+  - since there are no replicates - cannot create volcano plots for GFAP condition as well as can't compare to BAT (the other condition in this file) - therefore, creating one volcano plot for BAT condition (cre+/cre-) and scatterplots to comapre fold change for GFAP  

@@ -687,4 +687,112 @@ def get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutof
         plt.savefig(folder_path / (description+'barplot.png'))
         plt.show()   
     
-    return "done"            
+    return "done"    
+
+def scatterplot_plot(df, path_folder, file_name):
+    #df with the 2 columns that need to be plotted
+    df_cols = df.columns.tolist()
+
+    col_cond_1 = "LFC_" + df_cols[0]
+    col_cond_2 = "LFC_" + df_cols[1]
+
+    df[col_cond_1] = np.log2(df[df_cols[0]])
+    df[col_cond_2] = np.log2(df[df_cols[1]])
+        
+    df = df[["LFC_" + df_cols[0], "LFC_" + df_cols[1]]]
+    #add categorial column to identify values that are >=2 fold up or down regulated
+    #we call the new column "fold_change"
+    conditions = [
+        (df[col_cond_1] >= 1) & ((df[col_cond_2] >= -1) & (df[col_cond_2] <= 1)),
+        (df[col_cond_2] >= 1) & ((df[col_cond_1] >= -1) & (df[col_cond_1] <= 1)),
+        (df[col_cond_1] >= 1) & (df[col_cond_2] >= 1),]
+
+    choices = ["upreg_in_1_but_stable_in_2", 
+               "upreg_in_2_but_stable_in_1", 
+               "both_up"] 
+    df['fold_change'] = np.select(conditions, choices, default="stable")
+
+    #Create scatterplot 
+    plt.figure(figsize = (20,15))
+    ax = sns.scatterplot(x=col_cond_1, 
+                         y=col_cond_2, 
+                         data=df[df["fold_change"]=="stable"], 
+                         hue="fold_change", 
+                         palette=dict(stable="black"), 
+                         linewidth=0, 
+                         alpha = 0.3,
+                         s=50)
+    
+    sns.scatterplot(x=col_cond_1, 
+                    y=col_cond_2, 
+                    data=df[df["fold_change"]=="upreg_in_2_but_stable_in_1"], 
+                    hue="fold_change", 
+                    palette=dict(upreg_in_2_but_stable_in_1="#AF1818"), 
+                    linewidth=0, 
+                    alpha = 0.8,
+                    s=50)
+    
+    sns.scatterplot(x=col_cond_1, 
+                    y=col_cond_2, 
+                    data=df[df["fold_change"]=="both_up"], 
+                    hue="fold_change", 
+                    palette=dict(both_up="#36682B"), 
+                    linewidth=0, 
+                    alpha = 0.8,
+                    s=50)
+    
+    sns.scatterplot(x=col_cond_1, 
+                   y=col_cond_2, 
+                   data=df[df["fold_change"]=="upreg_in_1_but_stable_in_2"], 
+                    hue="fold_change", 
+                    palette=dict(upreg_in_1_but_stable_in_2="#4B4390"), 
+                    linewidth=0, 
+                    alpha = 0.8,
+                    s=50)
+    
+    
+    #ax.set_xlabel(condition_string)
+    #ax.set_ylabel(control_string)
+    ax.axhline(0, linewidth=1, color="black", linestyle = ":")
+    ax.axvline(0, linewidth=1, color="black", linestyle = ":") 
+    
+    ax.spines['top'].set_linewidth(2)
+    ax.spines['right'].set_linewidth(2)
+    ax.spines['bottom'].set_linewidth(2)
+    ax.spines['left'].set_linewidth(2)
+        
+    ax.xaxis.set_tick_params(width=2)
+    ax.yaxis.set_tick_params(width=2)
+        
+    ax.tick_params(axis='x', labelsize=12)
+    ax.tick_params(axis='y', labelsize=12)
+
+    subset_df = df[df["fold_change"] != "stable"]
+    subset_df = subset_df.reset_index()
+
+    subset_df['entry_name'] = subset_df['entry_name'].astype(str)
+
+    for line in range(0,subset_df.shape[0]):
+        if subset_df.fold_change[line] == "upreg_in_1_but_stable_in_2":
+            farbe = "#4B4390"
+        elif subset_df.fold_change[line] == "upreg_in_2_but_stable_in_1":
+            farbe = "#AF1818"
+        elif subset_df.fold_change[line] == "both_up":
+            farbe = '#36682B'
+            
+        plt.text(subset_df[col_cond_1][line]+0.09, 
+                 subset_df[col_cond_2][line], 
+                 subset_df.entry_name[line].split("_")[0], 
+                 horizontalalignment='left', 
+                 verticalalignment='center',
+                 size='small', 
+                 color=farbe, 
+                 weight='light')
+
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.title(file_name)
+    #plt.legend([],[], frameon=False)
+    plt.savefig(path_folder / (file_name + "scatterplot.svg"), dpi=300, bbox_inches='tight')
+    plt.show()
+    #df.to_csv(path_folder / (file_name + "data_for_scatterplot.csv"))
+    return(df)        
