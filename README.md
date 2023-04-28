@@ -14,6 +14,8 @@ Files were processed with the Vinogradova Lab pipeline and were treated as “wh
   - Peptides that are not fully tryptic were removed
   - Peptides with more than 1 missed cleavage site were removed
 
+Note: make sure to add (copy from old folders) both conditions_metadata.csv and metadata_col.csv - these files are needed for renaming the channels as well as specifying which are cre- and cre+ conditions
+
 ### **Step 2 (mouse_fasta_to_FP_TP_tables.py)**
 - create main table (based off of our mouse fasta file used for IP2 search)
   - read in fasta file to get all uniprot IDs
