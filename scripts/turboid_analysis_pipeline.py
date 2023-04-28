@@ -16,6 +16,7 @@ from src.filter_funcs import *
 from src.norm_funcs import *
 from src.readin_funcs import *
 import logging
+import subprocess 
 %load_ext autoreload
 %autoreload 2
 
@@ -29,10 +30,12 @@ paths_dict = paths_json["turbo_id_analysis_pipeline_paths"]
 
 # %%
 # paths % configs 
+commit_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip() 
 input_folder_path = Path(paths_dict['input_folder_path'])
 output_folder_path = Path(paths_dict['output_folder_path'])
 fasta_table_path = Path(paths_dict['fasta_table_path'])
 logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', filemode='w', encoding='utf-8', level=logging.INFO)
+logging.info(commit_sha)
 
 # %%
 # read in fasta table containing TP and FP annotation 
