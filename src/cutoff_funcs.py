@@ -15,8 +15,17 @@ def get_detailed_protein_annotation(df, volcano_df, fasta_table):
     df = df.drop(["annotation", "description"], axis = 1)
 
     annotated_df = pd.concat([df, volcano_df, fasta_table], axis=1)
+    annotated_df = annotated_df[~annotated_df.pep_num.isnull()]
     return annotated_df
 
+def add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling):
+    for condition in conditions_list: 
+        cond_subdf = df[df.filter(regex=condition).columns]
+        ctrl_cols = [col for col in cond_subdf.columns if control_labelling in col]
+        trt_cols = [col for col in cond_subdf.columns if treatment_labelling in col]
+        new_col_name = condition + '_FC(median_' +  treatment_labelling + "/(median_" + control_labelling + ")"
+        df[new_col_name] = df[trt_cols].median(axis=1) / df[ctrl_cols].median(axis=1)
+    return df
 
 def get_ratio_condition_df(sub_df, cond_columns, ctrl_columns):
     for condition in cond_columns:

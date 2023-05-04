@@ -67,8 +67,8 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
    - and you can also find a barplot indicating the abundance of TP and FP proteins in that final list compared to a barplot without any filtering (ie with what we started initially)
 2. Serum samples
    - also here each sample has its own folder 
-   - but with serum samples we do not perform any cutoff roc analysis
-   - TODO: before providing the final table for serum, I could filter based on enrichment in min 2 replicates, for now there is no filtering step  
+   - but with serum samples we do not perform any cutoff roc analysis we only add fold change columns (median cre+ / median cre-) per condition for easier filtering in final table
+   - there is no enrichment filtering appplied to this data, all identified proteins are shown in volcano plot 
    - the final table is annotated and volcano plots are created based on that table, volcano plot data can be found in the final table
 
 Ad volcano plots: p-values were calculated with T-test for the means of two independent samples and volcano plots show uncorrected p-values. Significant proteins which show a > 1.5 fold change are highlighted in either red or green. 
