@@ -114,7 +114,6 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
 
 Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M
 - condition scheme does not match other files so needed to make follwing changes:
-  - usually we compare the two conditions in a file in the end this is not the case here so skipping final pass_cutoff filter - which checks if either condition has passed with min 2 replicates - for this file specifically we treat GFAP and BAT individually thats why each condition has its own final table (BAT - min 2 replicates must have passed cutoff to be in final protein list, GFAP: at least one of the 3 ratios must have passed to be in final protein list) 
-  - for GFAP cre+ filtering is done on all 3 cre+ channels (ctrl, fast, LPS) if at least 2 pass sum and cv then protein passes
-  - Cre(-)_Ctrl_W6 is the control for all Cre(+) samples 
-  - since there are no replicates for GFAP - creating scatterplots to comapre fold change for GFAP  
+  - usually we compare the two conditions in a file in the end this is not the case here so skipping final pass_cutoff filter - which checks if either condition has passed with min 2 replicates - for this file specifically we treat GFAP and BAT individually thats why each condition has its own final table (BAT - min 2 replicates must have passed cutoff to be in final protein list (-> volcano plot), GFAP: at least one of the 3 ratios must have passed to be in final protein list (->scatterplots)) 
+  - for GFAP cre+ filtering is done on all 3 cre+ channels (ctrl, fast, LPS) if at least 2 pass sum and cv then protein passes, Cre(-)_Ctrl_W6 is the control for all Cre(+) samples 
+  - since there are no replicates for GFAP - creating scatterplots to compare fold change for GFAP  
