@@ -233,12 +233,25 @@ def get_p_value(row, cond_1, cond_2):
 
 def get_expr(row):
     if (row['log2_FC'] > 0.58) & (row['-log10_pval'] > 1.3):
+        return "Significant Up"
+    if (row['log2_FC'] > 0.58) & (row['-log10_pval'] < 1.3):
         return "Up"
-    elif (row['log2_FC'] < -0.58) & (row['-log10_pval'] > 1.3):
+    if (row['log2_FC'] < -0.58) & (row['-log10_pval'] > 1.3):
+        return "Significant Down"
+    if (row['log2_FC'] < -0.58) & (row['-log10_pval'] < 1.3):
         return "Down"
+    if (row['log2_FC'] > -0.58) & (row['log2_FC'] < 0.58) & (row['-log10_pval'] > 1.3):
+        return "Significant Stable"
     else:
         return "Stable"
 
+color_discrete_map = {'Significant Down': 'red', 
+                      'Down': 'orange', 
+                      'Significant Stable': 'darkgrey', 
+                      'Stable': 'lightgrey',
+                      'Significant Up': 'green',
+                      'Up': 'lightgreen' 
+                    }
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
     volcano_plot_list = []
@@ -275,15 +288,16 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
 
         title_name = file_name + " - " + conditions_list[0] +" vs. " + conditions_list[1] + " ("+ str(len(volcano_df)) + " Proteins)"
-        my_order = ["Down", "Stable", "Up"]
-        volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
-        colors_volcano = ["red", 'grey', 'green']
-
+        #my_order = ["Significant Down", "Down", "Significant Stable", "Stable", "Significant Up", "Up"]
+        #volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
+        #colors_volcano = ["red", "orange", "darkgrey", "lightgrey", "green", "lightgreen"]
+        
         fig = px.scatter(volcano_df, 
                          x='log2_FC', 
                          y='-log10_pval',
                          color='Regulation',
-                         color_discrete_sequence=colors_volcano,
+                         color_discrete_map=color_discrete_map,
+                         #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
                          title = title_name,
                          labels = {"log2_FC": x_axis_name},
@@ -352,8 +366,10 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             volcano_df["-log10_pval"] = -1*np.log10(volcano_df["p_value"])
             volcano_df["Regulation"] = volcano_df.apply(get_expr, axis=1)
             volcano_df["Regulation"] = volcano_df["Regulation"].astype('category')
-            my_order = ["Down", "Stable", "Up"]
+            #my_order = ["Down", "Stable", "Up"]
             #volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
+            #colors_volcano = ["red", "orange", "darkgrey", "lightgrey", "green", "darkgreen"]
+
             
             volcano_df = volcano_df.reset_index()
             volcano_df = volcano_df.set_index(["annotation"])
@@ -363,7 +379,8 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                                 x='log2_FC', 
                                  y='-log10_pval',
                                  color='Regulation',
-                                 color_discrete_sequence=["red", 'grey', 'green'],
+                                 #color_discrete_sequence=colors_volcano,
+                                 color_discrete_map=color_discrete_map,
                                  hover_data=['name', 'uniprot_id'],
                                  title = title_name,
                                  labels = {"log2_FC": x_axis_name},
@@ -428,16 +445,19 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
 
         title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + condition + "_" + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
         #my_order = ["Down", "Stable", "Up"]
-        my_order = ["Stable", "Up"]
-        volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
-        colors_volcano = ['grey', 'green']
+        #my_order = ["Significant Stable", "Stable", "Significant Up", "Up"]
+        #my_order = ["Stable", "Up"]
+        #volcano_df['Regulation'].cat.reorder_categories(my_order, inplace= True)
+        #colors_volcano = ["darkgrey", "lightgrey", "green", "darkgreen"]
+        #colors_volcano = ['grey', 'green']
         #colors_volcano = ["red", 'grey', 'green']
     
         fig = px.scatter(volcano_df, 
                          x='log2_FC', 
                          y='-log10_pval',
                          color='Regulation',
-                         color_discrete_sequence=colors_volcano,
+                         color_discrete_map=color_discrete_map,
+                         #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
                          title = title_name,
                          labels = {"log2_FC": x_axis_name},

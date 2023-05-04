@@ -303,8 +303,8 @@ for file_name in list_of_file_names:
         serum_file_folder_path = serum_folder_path / file_name.split("processed_census-out_")[1]
         if not os.path.exists(serum_file_folder_path):
             os.mkdir(serum_file_folder_path)
-        df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
         volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, serum_file_folder_path)
+        df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
         annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
         annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
 
