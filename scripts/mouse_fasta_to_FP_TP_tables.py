@@ -23,9 +23,14 @@ paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
 mouse_fasta_path = Path(paths_dict['mouse_fasta_path']) 
 tissue_localisation_path = Path(paths_dict['tissue_localisation_path']) 
 mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path']) 
-mitomatrix_mouse_ortholog_path = Path(paths_dict['mitomatrix_mouse_ortholog_path']) 
+#mitomatrix_mouse_ortholog_path = Path(paths_dict['mitomatrix_mouse_ortholog_path']) 
 mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
+secretion_prediction_resource_path = Path(paths_dict['secretion_prediction_resource_path'])
+
+# %% 
+spr_df = pd.read_csv(secretion_prediction_resource_path)
+spr_df = spr_df.rename(columns={"Accession":"uniprot_sp_key", "Organism":"organism"})
 
 # %%
 # read in fasta file as dict 
@@ -89,6 +94,16 @@ merged_main_fasta_table.shape
 # check if initial number of proteins is the same
 assert initial_number_of_entires == len(merged_main_fasta_table)
 
+
+#crossreference with secretion prediction resource shared by Corey 
+sp_list = spr_df.reset_index().uniprot_sp_key.tolist()
+merged_main_fasta_table = merged_main_fasta_table.reset_index()
+merged_main_fasta_table['Entry'] = merged_main_fasta_table['Entry'].astype(str)
+merged_main_fasta_table['uniprot_id'] = merged_main_fasta_table['uniprot_id'].astype(str)
+merged_main_fasta_table["uniprot_sp_key"] = merged_main_fasta_table.apply(check_uniprot, args=(sp_list,), axis=1)
+merged_main_fasta_table = merged_main_fasta_table.merge(spr_df, on="uniprot_sp_key", how="left")
+merged_main_fasta_table = merged_main_fasta_table.set_index('uniprot_id')
+
 # %% 
 # read in mitomatrix gene names - mitomatrix table is human, we work with mouse so we crossreference by gene name  
 mitomatrix_df = pd.read_csv(mitomatrix_protein_path)
@@ -97,7 +112,7 @@ mitomatrix_df = mitomatrix_df.explode("Gene Names")
 mitomatrix_df = mitomatrix_df.rename(columns={"Gene Names":"Gene name"})
 mitomatrix_df.head()
 
-# we need to becareful when crossreferencing by gene names
+# we need to be careful when crossreferencing by gene names
 # https://www.biostars.org/p/149115/
 # https://pypi.org/project/mousipy/
 # https://bioinformatics.stackexchange.com/questions/17486/converting-mouse-genes-to-human-genes
@@ -115,7 +130,9 @@ mouse_mitomatrix_genes_list = mitomatrix_mart_merge_df["Mouse gene name"].tolist
 # %%
 # annotate TP and FP
 # merged_main_fasta_table = merged_main_fasta_table.reset_index()
-merged_main_fasta_table["TP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_TP) 
+merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP, axis=1) 
+
+# %% 
 # merged_main_fasta_table["FP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_FP) 
 list_of_found_genes = []
 merged_main_fasta_table["FP"] = merged_main_fasta_table["Gene Names"].apply(annotate_FP_mitomatrix, args=(mouse_mitomatrix_genes_list, )) 
@@ -123,17 +140,16 @@ print(merged_main_fasta_table["TP"].value_counts())
 print(merged_main_fasta_table["FP"].value_counts())
 
 # %%
-# clean up annotation by making sure that if there is signal peptide then FP annotation is removed 
+# clean up annotation 
 merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation, axis=1) 
 merged_main_fasta_table["annotation"].value_counts()
 
 # %%
+# this is not necessary 
 # double check that there are no FPs with Signal peptide annotation
-assert merged_main_fasta_table[merged_main_fasta_table["annotation"]=="FP"]["Signal peptide"].notna().sum() == 0 
-
-# %%
+#assert merged_main_fasta_table[merged_main_fasta_table["annotation"]=="FP"]["Signal peptide"].notna().sum() == 0 
 # number of TP with Signal peptide
-merged_main_fasta_table[merged_main_fasta_table["annotation"]=="TP"]["Signal peptide"].value_counts().sum()
+#merged_main_fasta_table[merged_main_fasta_table["annotation"]=="TP"]["Signal peptide"].value_counts().sum()
 
 # %%
 # check spleen, adipose tissue, etc file names
@@ -157,5 +173,6 @@ merged_main_fasta_table.head()
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table.csv")
+
 
 # %%
