@@ -18,7 +18,7 @@ def annotate_TP(row):
         subcelullar_location = subcelullar_location.split("Note:")[0]
     for item in tp_term_list: 
         if item in subcelullar_location:
-            if sp_score >= 0.5 or ups_score >= 0.5: 
+            if sp_score > 0.7 or ups_score == 1: 
                 return "TP"
 
 def annotate_FP_subcellular_loc(subcelullar_location):
@@ -53,7 +53,7 @@ def conclude_annotation(df):
     if df["TP"] == "TP":
         return "TP" 
     elif df["FP"] == "FP":
-        if sp_score >= 0.5 or ups_score >= 0.5:  
+        if sp_score > 0.7 or ups_score == 1:  
             return np.nan
         else: 
             return "FP"
