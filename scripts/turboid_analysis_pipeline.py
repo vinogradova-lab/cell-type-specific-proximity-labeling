@@ -207,18 +207,22 @@ for file_name in list_of_file_names:
                 ylabel="log2(SI)", 
                 color = "green")
 
-    norm_df = normalization_cre_groups(df, conditions_list, treatment_labelling, control_labelling)
+    empty_cols = df.filter(like="Empty").columns.tolist()
+    if len(empty_cols) > 0:
+        df = df.drop(empty_cols, axis=1)
+
+    norm_df = normalization_allcre_channels(df, treatment_labelling) 
     assert len(norm_df) == len(df)
     assert norm_df.columns.tolist() == df.columns.tolist()
 
-    pca_fig_2 = get_pca_plot(norm_df, "Median of medians TP only, 2+ peptides, Cre+")
+    pca_fig_2 = get_pca_plot(norm_df, "Normalized")
     plot_list.append(pca_fig_2)
     
     norm_df_log = np.log2(norm_df)
     norm_df_log.plot(kind='box', 
                      rot=90, 
                      fontsize=10, 
-                     title="Median of medians TP only, 2+ peptides, Cre+", 
+                     title="Normalized", 
                      ax=ax2, 
                      xlabel="Channels", 
                      ylabel="log2(SI)", 

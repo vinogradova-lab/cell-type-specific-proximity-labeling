@@ -44,6 +44,76 @@ def normalization_cre_groups(df, conditions_list, treatment_labelling, control_l
     norm_df = norm_df[df.columns] # get the same order of columns 
     return norm_df
 
+def normalization_allcre_channels(df, treatment_labelling):
+    norm_factor_series = []
+    
+    cond_columns = df.filter(like=treatment_labelling).columns.tolist()
+    sub_df = df[cond_columns]
+        
+    norm_factors = sub_df.median().median() / sub_df.median()
+    norm_factor_series.append(norm_factors)
+
+    norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
+    print(norm_factor)
+    #logging.info("Normalization factors")
+    #logging.info(norm_factor)
+
+    normalized_df = df[norm_factor.index] * norm_factor
+    list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
+    untouched_ctrl_columns = df[list_of_ctrl_cols]
+    
+    norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
+    norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+    norm_df = norm_df[df.columns] # get the same order of columns 
+    return norm_df
+
+def normalization_all_channels(df):
+    norm_factor_series = []
+
+    norm_factors = df.median().median() / df.median()
+    norm_factor_series.append(norm_factors)
+
+    norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
+    #logging.info("Normalization factors")
+    print(norm_factor)
+    #logging.info(norm_factor)
+
+    normalized_df = df[norm_factor.index] * norm_factor
+    #list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
+    #untouched_ctrl_columns = df[list_of_ctrl_cols]
+    
+    #norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
+    #norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+    normalized_df = normalized_df[df.columns] # get the same order of columns 
+    return normalized_df
+
+# Median normalization is a global normalization method correcting for differential sample amounts in a robust manner. 
+# It centers the sample data to its corresponding median. 
+# First, median protein abundance ratio is calculated for each sample. 
+# Next, each individual protein abundance in a channel is divided by its corresponding median
+
+def normalization_all_channels_median(df):
+    norm_factor_series = []
+
+    norm_factors = df.median() #.median() / df.median()
+    norm_factor_series.append(norm_factors)
+
+    norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
+    #logging.info("Normalization factors")
+    print(norm_factor)
+    #logging.info(norm_factor)
+
+    normalized_df = df[norm_factor.index] / norm_factor
+    #list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
+    #untouched_ctrl_columns = df[list_of_ctrl_cols]
+    
+    #norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
+    #norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+    normalized_df = normalized_df[df.columns] # get the same order of columns 
+    return normalized_df
+
+
+
 #Normalisation Functions/pca func
 def get_pca_plot(df, title_string): #df needs to be without log
     #remove index from data 
