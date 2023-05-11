@@ -5,6 +5,45 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 import plotly.express as px
 
+def get_condition_df(df, condition_name):
+    sub_df = df.filter(regex=condition_name)
+    return(sub_df)
+
+def normalization_cre_groups(df, conditions_list, treatment_labelling, control_labelling):
+    # MEDIAN OF MEDIANS TP only, 2+ peptides
+    norm_factor_series = []
+    for condition in conditions_list:
+        sub_df = get_condition_df(df, condition)
+        cond_columns = sub_df.filter(like=treatment_labelling).columns.tolist()
+        ctrl_columns = sub_df.filter(like=control_labelling).columns.tolist()
+        sub_df["median_"+condition+"_"+treatment_labelling] = sub_df[cond_columns].median(axis=1)
+        sub_df["median_"+condition+"_"+control_labelling] = sub_df[ctrl_columns].median(axis=1)
+        sub_df["median_ratio"] = sub_df["median_"+condition+"_"+treatment_labelling] / sub_df["median_"+condition+"_"+control_labelling]
+        sub_df = sub_df.reset_index()
+        sub_df = sub_df[(sub_df["annotation"] == "TP") & (sub_df["pep_num"] >= 2)]
+        sub_df = sub_df.sort_values(by=['median_ratio'], ascending=False)
+        sub_df = sub_df.drop("median_"+condition+"_"+treatment_labelling, axis=1)
+        sub_df = sub_df.drop("median_"+condition+"_"+control_labelling, axis=1)
+        sub_df = sub_df.drop("median_ratio", axis=1)
+        sub_df = sub_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+        sub_df = sub_df[cond_columns]
+        
+        norm_factors = sub_df.median().median() / sub_df.median()
+        norm_factor_series.append(norm_factors)
+
+    norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
+    #logging.info("Normalization factors")
+    #logging.info(norm_factor)
+
+    normalized_df = df[norm_factor.index] * norm_factor
+    list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
+    untouched_ctrl_columns = df[list_of_ctrl_cols]
+    
+    norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
+    norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+    norm_df = norm_df[df.columns] # get the same order of columns 
+    return norm_df
+
 #Normalisation Functions/pca func
 def get_pca_plot(df, title_string): #df needs to be without log
     #remove index from data 
