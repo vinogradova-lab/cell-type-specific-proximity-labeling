@@ -130,7 +130,7 @@ mouse_mitomatrix_genes_list = mitomatrix_mart_merge_df["Mouse gene name"].tolist
 # %%
 # annotate TP and FP
 # merged_main_fasta_table = merged_main_fasta_table.reset_index()
-merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP, axis=1) 
+merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP_signalp, axis=1) 
 
 # %% 
 # merged_main_fasta_table["FP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_FP) 
@@ -141,7 +141,7 @@ print(merged_main_fasta_table["FP"].value_counts())
 
 # %%
 # clean up annotation 
-merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation, axis=1) 
+merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation_signalp, axis=1) 
 merged_main_fasta_table["annotation"].value_counts()
 
 # %%

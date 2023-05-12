@@ -8,7 +8,7 @@ def remove_duplicates_from_aggregate(row):
     return row
 
 
-def annotate_TP(row):
+def annotate_TP_signalp(row):
     tp_term_list = ["Endoplasmic Reticulum", "Endoplasmic reticulum", "Secreted", "secreted", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
     # "Golgi", "Extracellular space", "extracellular space", 
     subcelullar_location = str(row["Subcellular location [CC]"])
@@ -46,7 +46,7 @@ def annotate_FP_mitomatrix(gene_names, mitomatrix_list):
 #    elif df["FP"] == "FP" and pd.isnull(df["Signal peptide"]):
 #        return "FP"
 
-def conclude_annotation(df):   
+def conclude_annotation_signalp(df):   
     sp_score = df["Score"]
     ups_score = df["UPS_Score"]
 
