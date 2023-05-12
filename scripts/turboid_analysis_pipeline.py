@@ -166,6 +166,7 @@ for file_name in list_of_file_names:
 # (3) calculate median SI for each cre+ channel and median of sums; 
 # (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and 
 # (5) use those normalization values for each channel;
+# (6) to this for all channels or for only cre+ channels
 folder_path = output_folder_path / "03_normalisation_plots"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -205,52 +206,23 @@ for file_name in list_of_file_names:
                 xlabel="Channels", 
                 ylabel="log2(SI)", 
                 color = "green")
-    
-    
-    # MEDIAN OF MEDIANS TP only, 2+ peptides
-    norm_factor_series = []
-    for condition in conditions_list:
-        sub_df = get_condition_df(df, condition)
-        cond_columns = sub_df.filter(like=treatment_labelling).columns.tolist()
-        ctrl_columns = sub_df.filter(like=control_labelling).columns.tolist()
-        sub_df["median_"+condition+"_"+treatment_labelling] = sub_df[cond_columns].median(axis=1)
-        sub_df["median_"+condition+"_"+control_labelling] = sub_df[ctrl_columns].median(axis=1)
-        sub_df["median_ratio"] = sub_df["median_"+condition+"_"+treatment_labelling] / sub_df["median_"+condition+"_"+control_labelling]
-        sub_df = sub_df.reset_index()
-        sub_df = sub_df[(sub_df["annotation"] == "TP") & (sub_df["pep_num"] >= 2)]
-        sub_df = sub_df.sort_values(by=['median_ratio'], ascending=False)
-        sub_df = sub_df.drop("median_"+condition+"_"+treatment_labelling, axis=1)
-        sub_df = sub_df.drop("median_"+condition+"_"+control_labelling, axis=1)
-        sub_df = sub_df.drop("median_ratio", axis=1)
-        sub_df = sub_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
-        sub_df = sub_df[cond_columns]
-        
-        norm_factors = sub_df.median().median() / sub_df.median()
-        norm_factor_series.append(norm_factors)
 
-    norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
-    logging.info("Normalization factors")
-    logging.info(norm_factor)
+    empty_cols = df.filter(like="Empty").columns.tolist()
+    if len(empty_cols) > 0:
+        df = df.drop(empty_cols, axis=1)
 
-    normalized_df = df[norm_factor.index] * norm_factor
-    list_of_ctrl_cols = [column for column in df.columns if column not in norm_factor.index]
-    untouched_ctrl_columns = df[list_of_ctrl_cols]
-    
-    norm_df = normalized_df.reset_index().merge(untouched_ctrl_columns.reset_index(), on=["uniprot_id", "description", "pep_num", "annotation"])
-    norm_df = norm_df.set_index(["uniprot_id", "description", "pep_num", "annotation"])
-    norm_df = norm_df[df.columns] # get the same order of columns 
-    
+    norm_df = normalization_allcre_channels(df, treatment_labelling) 
     assert len(norm_df) == len(df)
     assert norm_df.columns.tolist() == df.columns.tolist()
 
-    pca_fig_2 = get_pca_plot(norm_df, "Median of medians TP only, 2+ peptides, Cre+")
+    pca_fig_2 = get_pca_plot(norm_df, "Normalized")
     plot_list.append(pca_fig_2)
     
     norm_df_log = np.log2(norm_df)
     norm_df_log.plot(kind='box', 
                      rot=90, 
                      fontsize=10, 
-                     title="Median of medians TP only, 2+ peptides, Cre+", 
+                     title="Normalized", 
                      ax=ax2, 
                      xlabel="Channels", 
                      ylabel="log2(SI)", 
