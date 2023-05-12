@@ -9,7 +9,7 @@ def remove_duplicates_from_aggregate(row):
 
 
 def annotate_TP(row):
-    tp_term_list = ["Endoplasmic Reticulum", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"] #"Secreted", "secreted"
+    tp_term_list = ["Endoplasmic Reticulum", "Endoplasmic reticulum", "Secreted", "secreted", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
     # "Golgi", "Extracellular space", "extracellular space", 
     subcelullar_location = str(row["Subcellular location [CC]"])
     sp_score = row["Score"]

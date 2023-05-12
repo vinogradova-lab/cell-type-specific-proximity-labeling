@@ -173,6 +173,3 @@ merged_main_fasta_table.head()
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_with_signal_p.csv")
-
-
-# %%
