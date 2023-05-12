@@ -7,6 +7,16 @@ def remove_duplicates_from_aggregate(row):
         row[col] = ', '.join(map(str, set(row[col])))
     return row
 
+def annotate_TP(subcelullar_location):
+    tp_term_list = ["Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
+    #"Golgi", "Extracellular space", "extracellular space", 
+    #
+    subcelullar_location = str(subcelullar_location)
+    if "Note:" in subcelullar_location:
+        subcelullar_location = subcelullar_location.split("Note:")[0]
+    for item in tp_term_list: 
+        if item in subcelullar_location:
+            return("TP")
 
 def annotate_TP_signalp(row):
     tp_term_list = ["Endoplasmic Reticulum", "Endoplasmic reticulum", "Secreted", "secreted", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
@@ -37,14 +47,14 @@ def annotate_FP_mitomatrix(gene_names, mitomatrix_list):
         if gene in mitomatrix_list:
             return "FP"
 
-##def conclude_annotation(df):   
-#    if df["TP"] == "TP":
-#        return "TP" 
-#    # if signal peptide is present then even though annotation says FP, change annotation to nan
-#    elif df["FP"] == "FP" and pd.notna(df["Signal peptide"]):
-#        return np.nan
-#    elif df["FP"] == "FP" and pd.isnull(df["Signal peptide"]):
-#        return "FP"
+def conclude_annotation(df):   
+    if df["TP"] == "TP":
+        return "TP" 
+    # if signal peptide is present then even though annotation says FP, change annotation to nan
+    elif df["FP"] == "FP" and pd.notna(df["Signal peptide"]):
+        return np.nan
+    elif df["FP"] == "FP" and pd.isnull(df["Signal peptide"]):
+        return "FP"
 
 def conclude_annotation_signalp(df):   
     sp_score = df["Score"]
