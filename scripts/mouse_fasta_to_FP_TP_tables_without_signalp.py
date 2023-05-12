@@ -23,7 +23,7 @@ paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
 mouse_fasta_path = Path(paths_dict['mouse_fasta_path']) 
 tissue_localisation_path = Path(paths_dict['tissue_localisation_path']) 
 mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path']) 
-mitomatrix_mouse_ortholog_path = Path(paths_dict['mitomatrix_mouse_ortholog_path']) 
+#mitomatrix_mouse_ortholog_path = Path(paths_dict['mitomatrix_mouse_ortholog_path']) 
 mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
 
