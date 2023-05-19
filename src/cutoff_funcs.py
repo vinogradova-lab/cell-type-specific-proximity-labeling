@@ -235,22 +235,22 @@ def get_expr(row):
     if (row['log2_FC'] > 0.58) & (row['-log10_pval'] > 1.3):
         return "Significant Up"
     if (row['log2_FC'] > 0.58) & (row['-log10_pval'] < 1.3):
-        return "Up"
+        return "Not Significant Up"
     if (row['log2_FC'] < -0.58) & (row['-log10_pval'] > 1.3):
         return "Significant Down"
     if (row['log2_FC'] < -0.58) & (row['-log10_pval'] < 1.3):
-        return "Down"
+        return "Not Significant Down"
     if (row['log2_FC'] > -0.58) & (row['log2_FC'] < 0.58) & (row['-log10_pval'] > 1.3):
-        return "Significant Stable"
+        return "Significant but <1.5 FC"
     else:
-        return "Stable"
+        return "Not Significant"
 
-color_discrete_map = {'Significant Down': 'red', 
-                      'Down': 'orange', 
-                      'Significant Stable': 'darkgrey', 
-                      'Stable': 'lightgrey',
-                      'Significant Up': 'green',
-                      'Up': 'lightgreen' 
+color_discrete_map = {'Significant Down': '#ff8080', 
+                      'Not Significant Down': '#ffcccc', 
+                      'Significant but <1.5 FC': 'darkgrey', 
+                      'Not Significant': 'lightgrey',
+                      'Significant Up': '#94c973',
+                      'Not Significant Up': '#d6f5d6' 
                     }
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
@@ -299,7 +299,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                          color_discrete_map=color_discrete_map,
                          #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
-                         title = title_name,
+                         title = title_name.replace("processed_census-out_", ""),
                          labels = {"log2_FC": x_axis_name},
                          template = "simple_white",
                          category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -307,7 +307,32 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
         fig.update_layout(legend=dict(title=""), title_x=0.5)
+        
+        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+
+        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
+        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
+        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
+        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+        labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
+        labels_df = labels_df.drop_duplicates()
+
+        for i,r in labels_df.iterrows():
+            if r['Regulation'] == 'Significant Down':
+                color = '#ff8080'
+            elif r['Regulation'] == 'Significant Up':
+                color = '#94c973'
+        
+            fig.add_annotation(x=r['log2_FC'],
+                               y=r["-log10_pval"],
+                               text= r['name'], 
+                               showarrow=False,
+                               xanchor='center',
+                               yanchor='bottom',
+                               font=dict(size=10, color=color))
+    
         volcano_plot_list.append(fig)
+
         volcano_df = volcano_df.reset_index().set_index("uniprot_id")
         volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
         volcano_df = volcano_df.add_suffix("_"+title_name)
@@ -382,7 +407,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                                  #color_discrete_sequence=colors_volcano,
                                  color_discrete_map=color_discrete_map,
                                  hover_data=['name', 'uniprot_id'],
-                                 title = title_name,
+                                 title = title_name.replace("processed_census-out_", ""),
                                  labels = {"log2_FC": x_axis_name},
                                  template = "simple_white",
                                  category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -390,6 +415,31 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
             fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
             fig.update_layout(legend=dict(title=""), title_x=0.5)
+            
+            
+            fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+
+            sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
+            sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
+            sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
+            sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+            labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
+            labels_df = labels_df.drop_duplicates()
+
+            for i,r in labels_df.iterrows():
+                if r['Regulation'] == 'Significant Down':
+                    color = '#ff8080'
+                elif r['Regulation'] == 'Significant Up':
+                    color = '#94c973'
+        
+                fig.add_annotation(x=r['log2_FC'],
+                                   y=r["-log10_pval"],
+                                   text= r['name'], 
+                                   showarrow=False,
+                                   xanchor='center',
+                                   yanchor='bottom',
+                                   font=dict(size=10, color=color))
+
             volcano_plot_list.append(fig)
             volcano_df = volcano_df.reset_index().set_index("uniprot_id")
             volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
@@ -459,7 +509,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
                          color_discrete_map=color_discrete_map,
                          #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
-                         title = title_name,
+                         title = title_name.replace("processed_census-out_", ""),
                          labels = {"log2_FC": x_axis_name},
                          template = "simple_white",
                          category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -467,6 +517,30 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
         fig.update_layout(legend=dict(title=""), title_x=0.5)
+        
+        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+
+        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
+        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
+        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
+        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+        labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
+        labels_df = labels_df.drop_duplicates()
+
+        for i,r in labels_df.iterrows():
+            if r['Regulation'] == 'Significant Down':
+                color = '#ff8080'
+            elif r['Regulation'] == 'Significant Up':
+                color = '#94c973'
+        
+            fig.add_annotation(x=r['log2_FC'],
+                               y=r["-log10_pval"],
+                               text= r['name'], 
+                               showarrow=False,
+                               xanchor='center',
+                               yanchor='bottom',
+                               font=dict(size=10, color=color))
+
         volcano_plot_list.append(fig)
         volcano_df = volcano_df.reset_index().set_index("uniprot_id")
         volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
