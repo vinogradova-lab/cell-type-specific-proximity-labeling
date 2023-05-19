@@ -235,22 +235,22 @@ def get_expr(row):
     if (row['log2_FC'] > 0.58) & (row['-log10_pval'] > 1.3):
         return "Significant Up"
     if (row['log2_FC'] > 0.58) & (row['-log10_pval'] < 1.3):
-        return "Up"
+        return "Not Significant Up"
     if (row['log2_FC'] < -0.58) & (row['-log10_pval'] > 1.3):
         return "Significant Down"
     if (row['log2_FC'] < -0.58) & (row['-log10_pval'] < 1.3):
-        return "Down"
+        return "Not Significant Down"
     if (row['log2_FC'] > -0.58) & (row['log2_FC'] < 0.58) & (row['-log10_pval'] > 1.3):
-        return "Significant Stable"
+        return "Significant but <1.5 FC"
     else:
-        return "Stable"
+        return "Not Significant"
 
-color_discrete_map = {'Significant Down': 'red', 
-                      'Down': 'orange', 
-                      'Significant Stable': 'darkgrey', 
-                      'Stable': 'lightgrey',
-                      'Significant Up': 'green',
-                      'Up': 'lightgreen' 
+color_discrete_map = {'Significant Down': '#ff8080', 
+                      'Not Significant Down': '#ffcccc', 
+                      'Significant but <1.5 FC': 'darkgrey', 
+                      'Not Significant': 'lightgrey',
+                      'Significant Up': '#99e699',
+                      'Not Significant Up': '#d6f5d6' 
                     }
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
@@ -299,7 +299,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                          color_discrete_map=color_discrete_map,
                          #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
-                         title = title_name,
+                         title = title_name.replace("processed_census-out_", ""),
                          labels = {"log2_FC": x_axis_name},
                          template = "simple_white",
                          category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -312,6 +312,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
         volcano_df = volcano_df.add_suffix("_"+title_name)
         volcano_df_list.append(volcano_df)
+        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
         
     elif len(conditions_list) == 3: 
         list_columns_trt = df.filter(like=treatment_labelling).columns.tolist()
@@ -382,7 +383,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                                  #color_discrete_sequence=colors_volcano,
                                  color_discrete_map=color_discrete_map,
                                  hover_data=['name', 'uniprot_id'],
-                                 title = title_name,
+                                 title = title_name.replace("processed_census-out_", ""),
                                  labels = {"log2_FC": x_axis_name},
                                  template = "simple_white",
                                  category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -395,6 +396,9 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
             volcano_df = volcano_df.add_suffix("_"+title_name)
             volcano_df_list.append(volcano_df)
+            
+            fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+
 
     with open(folder_path / 'volcano_plots.html' , 'w') as f:
         for fig in volcano_plot_list:
@@ -459,7 +463,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
                          color_discrete_map=color_discrete_map,
                          #color_discrete_sequence=colors_volcano,
                          hover_data=['name', 'uniprot_id'],
-                         title = title_name,
+                         title = title_name.replace("processed_census-out_", ""),
                          labels = {"log2_FC": x_axis_name},
                          template = "simple_white",
                          category_orders={'Regulation': np.sort(volcano_df['Regulation'].unique())})
@@ -472,6 +476,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.drop(["annotation", "description", "pep_num", "name"], axis=1)
         volcano_df = volcano_df.add_suffix("_"+title_name)
         volcano_df_list.append(volcano_df)
+        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
         
     with open(folder_path / 'volcano_plots.html' , 'w') as f:
         for fig in volcano_plot_list:
