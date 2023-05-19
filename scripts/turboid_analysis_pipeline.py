@@ -18,6 +18,7 @@ from src.readin_funcs import *
 import logging
 import subprocess 
 import warnings 
+import kaleido
 warnings.filterwarnings('ignore')
 %load_ext autoreload
 %autoreload 2
@@ -195,6 +196,7 @@ for file_name in list_of_file_names:
     
     # RAW
     pca_fig_1 = get_pca_plot(df, "Raw")
+    pca_fig_1.write_image(file_folder_path / "pca_raw_data.svg", engine="kaleido")
     plot_list.append(pca_fig_1)
     
     df_log = np.log2(df)
@@ -216,6 +218,7 @@ for file_name in list_of_file_names:
     assert norm_df.columns.tolist() == df.columns.tolist()
 
     pca_fig_2 = get_pca_plot(norm_df, "Normalized")
+    pca_fig_2.write_image(file_folder_path / "pca_norm_data.svg", engine="kaleido")
     plot_list.append(pca_fig_2)
     
     norm_df_log = np.log2(norm_df)

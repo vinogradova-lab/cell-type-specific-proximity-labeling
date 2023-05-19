@@ -182,6 +182,9 @@ def get_pca_plot(df, title_string): #df needs to be without log
                          "condition": "Condition"},
                      title=title_string+" ("+str(number_of_proteins_in_common)+" Proteins)")
 
+    fig.update_traces(marker=dict(size=12),
+                      selector=dict(mode='markers'))
+
     fig.update_xaxes(dtick=10, range=[min_number, max_number])
     fig.update_yaxes(dtick=10, range=[min_number, max_number])
 
