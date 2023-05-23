@@ -425,6 +425,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
             labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
             labels_df = labels_df.drop_duplicates()
+            labels_df = labels_df.loc[~np.isinf(labels_df["log2_FC"])]
 
             for i,r in labels_df.iterrows():
                 if r['Regulation'] == 'Significant Down':
