@@ -19,6 +19,7 @@ import logging
 import subprocess 
 import warnings 
 import kaleido
+import itertools
 warnings.filterwarnings('ignore')
 %load_ext autoreload
 %autoreload 2
@@ -279,9 +280,11 @@ for file_name in list_of_file_names:
         if not os.path.exists(serum_file_folder_path):
             os.mkdir(serum_file_folder_path)
         volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, serum_file_folder_path)
+        get_heatmap(df, treatment_labelling, volcano_df, file_name, serum_file_folder_path)
         df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
         annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
         annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
+        
 
     elif file_type == "tissue":
         tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
@@ -326,27 +329,5 @@ for file_name in list_of_file_names:
             volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
             pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
             pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
-# %%
-
-###this is test code, add break in line 328 to run only one file 
-subset_for_heatmap = pass_cutoff_df_norm_data.filter(like="cre+", axis=1)
-subset_for_heatmap = subset_for_heatmap.reset_index().drop(["uniprot_id", "pep_num", "annotation"], axis=1).set_index("description")
-subset_for_heatmap.index = subset_for_heatmap.index.str.split(" ").str[0]
-
-# %% 
-for condition in conditions_list:
-    list_columns_cond = subset_for_heatmap.filter(like=condition).columns.tolist()
-    cond_df = subset_for_heatmap[list_columns_cond]
-    subset_for_heatmap["mean_"+condition+"_"+treatment_labelling] = cond_df.mean(axis=1)
-
-subset_for_heatmap["FC"] = subset_for_heatmap["mean_"+conditions_list[0]+"_"+treatment_labelling] / subset_for_heatmap["mean_"+conditions_list[1]+"_"+treatment_labelling]
-# %%
-hm = sns.clustermap(subset_for_heatmap.sort_values(by="FC", ascending=True).head(30), z_score=0, cmap="RdBu_r", center=0)
-hm.ax_row_dendrogram.set_visible(False)
-hm.ax_col_dendrogram.set_visible(False)
-#hm.ax_row_dendrogram.set_xlim([0,0])
-# %%
-hm = sns.clustermap(subset_for_heatmap.sort_values(by="FC", ascending=False).head(30), z_score=0, cmap="RdBu_r", center=0)
-hm.ax_row_dendrogram.set_visible(False)
-hm.ax_col_dendrogram.set_visible(False)
+            get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, tissue_file_folder_path)
 # %%
