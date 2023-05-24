@@ -330,4 +330,5 @@ for file_name in list_of_file_names:
             pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
             pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
             get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, tissue_file_folder_path)
+
 # %%

@@ -310,12 +310,13 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         
         fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
-        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
-        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
-        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
-        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(30)
+        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(30)
+        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(30)
+        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(30)
         labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
         labels_df = labels_df.drop_duplicates()
+        labels_df = labels_df.loc[~np.isinf(labels_df["log2_FC"])]
 
         for i,r in labels_df.iterrows():
             if r['Regulation'] == 'Significant Down':
@@ -419,10 +420,10 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             
             fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
-            sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
-            sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
-            sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
-            sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+            sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(30)
+            sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(30)
+            sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(30)
+            sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(30)
             labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
             labels_df = labels_df.drop_duplicates()
             labels_df = labels_df.loc[~np.isinf(labels_df["log2_FC"])]
@@ -521,12 +522,13 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         
         fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
-        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(10)
-        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(10)
-        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(10)
-        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(10)
+        sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(30)
+        sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(30)
+        sign_down_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="-log10_pval", ascending=False).head(30)
+        sign_down_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Down"].sort_values(by="log2_FC", ascending=True).head(30)
         labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
         labels_df = labels_df.drop_duplicates()
+        labels_df = labels_df.loc[~np.isinf(labels_df["log2_FC"])]
 
         for i,r in labels_df.iterrows():
             if r['Regulation'] == 'Significant Down':
@@ -925,10 +927,10 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
         fc_col = [col for col in test_df if col.startswith('log2_FC_')]
         pval_col = [col for col in test_df if col.startswith('-log10_pval_')]
 
-        sign_up_df = test_df.loc[test_df[reg_col[0]] == "Significant Up"].sort_values(by=pval_col[0], ascending=False)#.head(10)
-        sign_up_df_fc = test_df.loc[test_df[reg_col[0]] == "Significant Up"].sort_values(by=fc_col[0], ascending=False)#.head(10)
-        sign_down_df = test_df.loc[test_df[reg_col[0]] == "Significant Down"].sort_values(by=pval_col[0], ascending=False)#.head(10)
-        sign_down_df_fc = test_df.loc[test_df[reg_col[0]] == "Significant Down"].sort_values(by=fc_col[0], ascending=True)#.head(10)
+        sign_up_df = test_df.loc[test_df[reg_col[0]] == "Significant Up"].sort_values(by=pval_col[0], ascending=False).head(30)
+        sign_up_df_fc = test_df.loc[test_df[reg_col[0]] == "Significant Up"].sort_values(by=fc_col[0], ascending=False).head(30)
+        sign_down_df = test_df.loc[test_df[reg_col[0]] == "Significant Down"].sort_values(by=pval_col[0], ascending=False).head(30)
+        sign_down_df_fc = test_df.loc[test_df[reg_col[0]] == "Significant Down"].sort_values(by=fc_col[0], ascending=True).head(30)
         labels_df = pd.concat([sign_up_df, sign_down_df, sign_up_df_fc, sign_down_df_fc], axis=0)
         labels_df = labels_df.drop_duplicates()
         #print(len(labels_df))
@@ -943,13 +945,15 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
     subset_for_heatmap = subset_for_heatmap.reset_index("uniprot_id")
     subset_for_heatmap = subset_for_heatmap.drop("uniprot_id", axis=1).set_index("description")
 
-    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 145, s=60, as_cmap=True), center=0, figsize=(12,40), yticklabels=True)
+    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 145, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     g.ax_row_dendrogram.set_visible(False)
     g.ax_col_dendrogram.set_visible(False)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize = 10)
     g.ax_heatmap.set_title(file_name) 
+    g.ax_cbar.set_ylabel("z-score",size=15)
+    g.ax_cbar.set_position((0.1, .2, .03, .4))
 
-    g.savefig(folder_path / "signupdown_cond_heatmap.svg", dpi=400)
+    g.savefig(folder_path / "signupdown_cond_heatmap.pdf", dpi=400)
     subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
     return "done"
  
