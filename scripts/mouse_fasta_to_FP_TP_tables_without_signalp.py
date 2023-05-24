@@ -27,6 +27,7 @@ mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path'])
 mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
 secretion_prediction_resource_path = Path(paths_dict['secretion_prediction_resource_path'])
+gene_id_path = Path(paths_dict['gene_id_path'])
 
 # %% 
 spr_df = pd.read_csv(secretion_prediction_resource_path)
@@ -94,7 +95,7 @@ merged_main_fasta_table.shape
 # check if initial number of proteins is the same
 assert initial_number_of_entires == len(merged_main_fasta_table)
 
-
+# %% 
 #crossreference with secretion prediction resource shared by Corey 
 sp_list = spr_df.reset_index().uniprot_sp_key.tolist()
 merged_main_fasta_table = merged_main_fasta_table.reset_index()
@@ -130,7 +131,7 @@ mouse_mitomatrix_genes_list = mitomatrix_mart_merge_df["Mouse gene name"].tolist
 # %%
 # annotate TP and FP
 # merged_main_fasta_table = merged_main_fasta_table.reset_index()
-merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP_signalp, axis=1) 
+merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP, axis=1) 
 
 # %% 
 # merged_main_fasta_table["FP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_FP) 
@@ -141,9 +142,12 @@ print(merged_main_fasta_table["FP"].value_counts())
 
 # %%
 # clean up annotation 
-merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation_signalp, axis=1) 
+merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation, axis=1) 
 merged_main_fasta_table["annotation"].value_counts()
 
+# %% 
+assert len(merged_main_fasta_table.loc[merged_main_fasta_table["annotation"] == "TP"]) == 2806
+assert len(merged_main_fasta_table.loc[merged_main_fasta_table["annotation"] == "FP"]) == 435
 # %%
 # this is not necessary 
 # double check that there are no FPs with Signal peptide annotation
@@ -170,6 +174,17 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 print(merged_main_fasta_table.shape)
 merged_main_fasta_table.head()
 
+# %% 
+# add gene id column 
+gene_id_df = pd.read_csv(gene_id_path)
+gene_id_df.columns = ["uniprot_id", "gene_id"]
+gene_id_df = gene_id_df.set_index("uniprot_id")
+
+# %% 
+# merge 
+merged_main_fasta_table = merged_main_fasta_table.join(gene_id_df, how="left")
+
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_without_signal_p.csv")
+# %%

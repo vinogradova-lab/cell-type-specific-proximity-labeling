@@ -13,6 +13,7 @@
         "mitomatrix_protein_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/NIHMS552295-supplement-Supplementary_Data_1.csv",
         "mart_export_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/mart_export(8).txt",
         "output_folder_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table",
-        "secretion_prediction_resource_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/Secretion_Prediction_Resource.csv"
+        "secretion_prediction_resource_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/Secretion_Prediction_Resource.csv",
+        "gene_id_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/03_geneid_mapping/uniprot-download_true_format_xlsx-2023.05.24-21.24.58.46.csv"
     }
 }
