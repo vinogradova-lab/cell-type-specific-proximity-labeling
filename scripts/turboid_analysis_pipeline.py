@@ -19,6 +19,7 @@ import logging
 import subprocess 
 import warnings 
 import kaleido
+import itertools
 warnings.filterwarnings('ignore')
 %load_ext autoreload
 %autoreload 2
@@ -279,9 +280,11 @@ for file_name in list_of_file_names:
         if not os.path.exists(serum_file_folder_path):
             os.mkdir(serum_file_folder_path)
         volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, serum_file_folder_path)
+        get_heatmap(df, treatment_labelling, volcano_df, file_name, serum_file_folder_path)
         df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
         annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
         annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
+        
 
     elif file_type == "tissue":
         tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
@@ -325,6 +328,7 @@ for file_name in list_of_file_names:
         else: 
             volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
             pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
-            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
-            
+            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
+            get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, tissue_file_folder_path)
+
 # %%
