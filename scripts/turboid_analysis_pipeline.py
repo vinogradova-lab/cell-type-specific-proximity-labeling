@@ -15,6 +15,7 @@ from src.cutoff_funcs import *
 from src.filter_funcs import *
 from src.norm_funcs import *
 from src.readin_funcs import *
+from src.go_funcs import * 
 import logging
 import subprocess 
 import warnings 
@@ -332,3 +333,15 @@ for file_name in list_of_file_names:
             get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, tissue_file_folder_path)
 
 # %%
+GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
+# %%
+obodag, ns2assoc = initialize_godag_obj(file_gene2go)
+# %%
+#df = normalized_dict[file_name]
+#df.index.levels[0].tolist() - if you need df specific list 
+goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
+
+# %% 
+GO_items = get_all_goterms(goeaobj)
+# %%
+get_up_down_goterm(volcano_df, folder_path)
