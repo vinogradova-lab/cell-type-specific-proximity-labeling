@@ -180,13 +180,22 @@ merged_main_fasta_table.head()
 gene_id_df = pd.read_csv(gene_id_path)
 gene_id_df.columns = ["uniprot_id", "gene_id"]
 gene_id_df = gene_id_df.set_index("uniprot_id")
+gene_id_df['gene_id']= gene_id_df['gene_id'].astype(str)
+gene_id_df = gene_id_df.reset_index().groupby('uniprot_id')['gene_id'].apply(list).reset_index().set_index("uniprot_id")
+gene_id_df = gene_id_df['gene_id'].apply(', '.join).reset_index().set_index("uniprot_id")
+gene_id_df["alterantive_gene_id"] = gene_id_df["gene_id"].str.split(", ", 1).str[1]
+gene_id_df["gene_id"] = gene_id_df["gene_id"].str.split(", ", 1).str[0]
 
 # %% 
 # merge 
 merged_main_fasta_table = merged_main_fasta_table.join(gene_id_df, how="left")
 
+# %% 
+assert initial_number_of_entires == len(merged_main_fasta_table)
 
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_with_signal_p.csv")
+
+
 # %%
