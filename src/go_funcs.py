@@ -81,8 +81,9 @@ def initialize_godag_obj(file_gene2go):
 
 def create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None):
     if reference_list: 
-        GeneID2nt_mus = dict(filter(lambda item: item[0] in reference_list, GeneID2nt_mus.items()))
-        print('Number of items in reference lsit provided:', len(reference_list))
+        reference_list_wona = [item for item in reference_list if str(item) != 'nan']
+        GeneID2nt_mus = dict(filter(lambda item: item[0] in reference_list_wona, GeneID2nt_mus.items()))
+        print('Number of items in reference list provided:', len(reference_list_wona))
 
     print('Number of items in reference list: ', len(GeneID2nt_mus))
 
@@ -119,7 +120,7 @@ def get_all_goterms(goeaobj):
     
     return GO_items
 
-def go_it(test_genes):
+def go_it(test_genes, goeaobj, GO_items, inv_map):
     print(f'Numper of input GeneIDs: {len(test_genes)}')
     
     goea_results_all = goeaobj.run_study(test_genes)
@@ -183,7 +184,7 @@ def create_go_plots(df):
         bp.set_yticklabels([textwrap.fill(e, 40) for e in sub_df['term']])
         bp.set_title(go_class.replace("_", " ").title())
         bp.set_ylabel("")
-    
+        
         cbar = plt.colorbar(mapper, shrink=0.50, ax=axs[count])
         cbar.set_label('-log10(FDR)', rotation=270,labelpad=30)
         count += 1
@@ -191,33 +192,39 @@ def create_go_plots(df):
     return fig    
 
 
-def get_up_down_goterm(volcano_df, folder_path):
+def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_path, reference):
     #change filter not volcano_df 
-    
-    volcano_cols = volcano_df.columns.tolist()
-    cols_list = [col.split(" - ")[1].split(" (")[0] for col in volcano_cols]
+
+    reg_cols = pass_cutoff_true_df.filter(regex="Regulation_").columns.tolist()
+    cols_to_select = ["gene_id"] + reg_cols
+    subset_df = pass_cutoff_true_df[cols_to_select]
+    subset_df = subset_df.reset_index().set_index(["uniprot_id", "gene_id"])
+    cols_list = [col.split(" - ")[1].split(" (")[0] for col in subset_df]
     unique_col_list = list(set(cols_list))
 
     for comparison in unique_col_list: 
-        comparison_df = volcano_df.filter(like=comparison)
+        print(comparison)
+        comparison_df = subset_df.filter(like=comparison)
         reg_col = [col for col in comparison_df if col.startswith('Regulation_')]
 
-        sign_up = comparison_df.loc[df[reg_col[0]] == "Significant Up"]
+        sign_up = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Up"]
         up_gene_ids_list = sign_up.reset_index().gene_id.tolist()
-        print("UP:", len(up_gene_ids_list))
+        up_gene_ids_list_wona = [item for item in up_gene_ids_list if str(item) != 'nan']
+        print("nas in UP:", len(up_gene_ids_list) - len(up_gene_ids_list_wona))
 
-        df = go_it(up_gene_ids_list)
+        df = go_it(up_gene_ids_list_wona, goeaobj, GO_items, inv_map)
         fig = create_go_plots(df)
-        df.to_csv(folder_path / (comparison + "_up_go_term_results.csv"))
-        fig.savefig(folder_path / (comparison + "_up_go_term_plot.svg"))
+        df.to_csv(folder_path / ("goterm_" + reference + '_' + comparison + "_up_go_term_results.csv"))
+        fig.savefig(folder_path / ("goterm_" + reference + '_' + comparison + "_up_go_term_plot.pdf"), bbox_inches='tight')
 
-        sign_down = comparison_df.loc[df[reg_col[0]] == "Significant Down"]
+        sign_down = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Down"]
         down_gene_ids_list = sign_down.reset_index().gene_id.tolist()
-        print("DOWN:", len(down_gene_ids_list))
+        down_gene_ids_list_wona = [item for item in down_gene_ids_list if str(item) != 'nan']
+        print("nas in DOWN:", len(down_gene_ids_list) - len(down_gene_ids_list_wona))
 
-        df = go_it(down_gene_ids_list)
+        df = go_it(down_gene_ids_list_wona, goeaobj, GO_items, inv_map)
         fig = create_go_plots(df)
-        df.to_csv(folder_path / (comparison + "_down_go_term_results.csv"))
-        fig.savefig(folder_path / (comparison + "_down_go_term_plot.svg"))
+        df.to_csv(folder_path / ("goterm_" + reference + '_' + comparison + "_down_go_term_results.csv"))
+        fig.savefig(folder_path / ("goterm_" + reference + '_' + comparison + "_down_go_term_plot.pdf"), bbox_inches='tight')
     
     return "done"

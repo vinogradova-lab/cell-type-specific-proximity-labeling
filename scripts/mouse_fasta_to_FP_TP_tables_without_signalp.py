@@ -197,3 +197,7 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_without_signal_p.csv")
 # %%
+#df = pd.DataFrame.from_dict(inv_map, orient='index', columns=["gene_name"]).reset_index()
+#df.columns = ["gene_id", "gene_symbol"]
+#fasta_table["gene_symbol"] = fasta_table["description"].str.split("GN=", 1).str[1]
+#fasta_table.merge(df, on="gene_symbol", how="left").to_csv("test.csv")

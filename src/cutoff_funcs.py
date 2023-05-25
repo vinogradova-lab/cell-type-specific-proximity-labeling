@@ -953,7 +953,7 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
     g.ax_cbar.set_ylabel("z-score",size=15)
     g.ax_cbar.set_position((0.1, .2, .03, .4))
 
-    g.savefig(folder_path / "signupdown_cond_heatmap.pdf", dpi=400)
+    g.savefig(folder_path / "heatmap_signupdown_cond.pdf", dpi=400)
     subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
     return "done"
  

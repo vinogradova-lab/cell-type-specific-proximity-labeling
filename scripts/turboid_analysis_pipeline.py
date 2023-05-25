@@ -252,6 +252,12 @@ for file_name in list_of_file_names:
     df = normalized_dict[file_name]
     df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
 
+# %% 
+# Initialization for go term analysis 
+GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
+obodag, ns2assoc = initialize_godag_obj(file_gene2go)
+goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
+GO_items = get_all_goterms(goeaobj)
 
 # %% 
 # split tissue and serum 
@@ -285,7 +291,14 @@ for file_name in list_of_file_names:
         df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
         annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
         annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
-        
+        get_up_down_goterm(annotated_protein_df, goeaobj, GO_items, inv_map, serum_file_folder_path, 'full_mouse_genome')
+
+        # goterms with reference list 
+        ref_df = normalized_dict[file_name]
+        gene_id_list = ref_df.reset_index().set_index("uniprot_id").join(fasta_table["gene_id"]).gene_id.tolist()
+        goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
+        GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
+        get_up_down_goterm(annotated_protein_df, goeaobj_ref_list, GO_items_ref_list, inv_map, serum_file_folder_path, 'ref_list')
 
     elif file_type == "tissue":
         tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
@@ -331,17 +344,11 @@ for file_name in list_of_file_names:
             pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
             pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
             get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, tissue_file_folder_path)
-
-# %%
-GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
-# %%
-obodag, ns2assoc = initialize_godag_obj(file_gene2go)
-# %%
-#df = normalized_dict[file_name]
-#df.index.levels[0].tolist() - if you need df specific list 
-goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
-
-# %% 
-GO_items = get_all_goterms(goeaobj)
-# %%
-get_up_down_goterm(volcano_df, folder_path)
+            get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, tissue_file_folder_path, 'full_mouse_genome')
+            
+            # goterms with reference list 
+            ref_df = normalized_dict[file_name]
+            gene_id_list = ref_df.reset_index().set_index("uniprot_id").join(fasta_table["gene_id"]).gene_id.tolist()
+            goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
+            GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
+            get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, tissue_file_folder_path, 'ref_list')
