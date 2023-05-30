@@ -352,5 +352,61 @@ for file_name in list_of_file_names:
             goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
             GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
             get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, tissue_file_folder_path, 'ref_list')
+    break
+# %%
+df = pd.read_csv("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_dontuse/min_1_pep_per_protein/05_results/01_tissue/20230512_EV2-28A/goterm_full_mouse_genome_fast_turbo vs. ctrl_turbo_down_go_term_results.csv")
 
+# %% 
+fig, axs = plt.subplots(nrows=3, figsize=(5,8))
+count = 0 
+go_class = "Molecular Function"
+cmap = mpl.cm.Blues
+min_val, max_val, n = 0.3, 1.0, 10
+colors = cmap(np.linspace(min_val, max_val, n))
+cmap = mpl.colors.LinearSegmentedColormap.from_list("cmap", colors)
+
+norm = mpl.colors.Normalize(vmin = df['-log10(FDR)'].min(), vmax = df['-log10(FDR)'].max())
+mapper = cm.ScalarMappable(norm = norm, cmap = cmap)
+mapper.set_array([]) 
+
+
+
+bp = sns.scatterplot(data = df, 
+                 x = '-log10(FDR)', 
+                 y = 'term',
+                 size = 'n_genes',
+                 sizes=(20, 200),
+                 palette = mapper.to_rgba(df["-log10(FDR)"].values),
+                 ax=axs[count])
+bp.set_yticklabels([textwrap.fill(e, 40) for e in df['term']])
+bp.set_title(go_class.replace("_", " ").title())
+bp.set_ylabel("")
+bp.legend(markerscale=1)
+bp.legend(loc='upper left', bbox_to_anchor=(1.1, 0.5), labelspacing=1, markerscale=1.5)
+# %% 
+# Reorder it based on values:
+
+ordered_df = df.sort_values(by='-log10(FDR)')
+my_range=range(1,len(df.index)+1)
+
+# %% 
+ 
+# Create a color if the group is "B"
+my_color=np.where(ordered_df['-log10(FDR)']=='B', 'orange', 'skyblue')
+#my_size=np.where(ordered_df ['-log10(FDR)']=='B', 70, 30)
+
+# %%
+ 
+# The horizontal plot is made using the hline() function
+plt.hlines(y=my_range, xmin=0, xmax=ordered_df['-log10(FDR)'], color=my_color, alpha=0.4)
+plt.scatter(ordered_df['-log10(FDR)'], my_range, color=my_color, s=ordered_df['n_genes'], alpha=1)
+ 
+# Add title and axis names
+plt.yticks(my_range, ordered_df['term'])
+plt.title("What about the B group?", loc='left')
+plt.xlabel('-log10(FDR)')
+#plt.ylabel('Term')
+
+# show the graph
+plt.show()
 # %%

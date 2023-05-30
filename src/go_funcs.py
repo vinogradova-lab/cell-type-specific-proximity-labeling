@@ -149,7 +149,7 @@ def go_it(test_genes, goeaobj, GO_items, inv_map):
     df = df[df.n_genes > 1]
     df["-log10(FDR)"] = -1*np.log10(df["p_fdr_bh"])
     df = df.sort_values(by='-log10(FDR)', ascending=False)
-    #df['percent_study_genes_in_go'] = df.n_genes/df.n_go
+    df['fold_enrichment'] = (df.n_genes/df.n_go) * 100 
     
     return df
 
@@ -158,35 +158,46 @@ def go_it(test_genes, goeaobj, GO_items, inv_map):
 
 def create_go_plots(df):
     class_list = list(set(df['class'].tolist()))
+    class_list_sorted = sorted(class_list)
     
-    fig, axs = plt.subplots(nrows=3, figsize=(10,20))
+    fig, axs = plt.subplots(nrows=3, figsize=(5,10))
     fig.tight_layout(pad=4.0)
     count = 0 
 
-    for go_class in class_list:
+    for go_class in class_list_sorted:
         sub_df = df.loc[df['class'] == go_class]
         sub_df = sub_df.head(10)
     
-        cmap = mpl.cm.Blues
-        min_val, max_val, n = 0.3, 1.0, 10
-        colors = cmap(np.linspace(min_val, max_val, n))
-        cmap = mpl.colors.LinearSegmentedColormap.from_list("cmap", colors)
+        # = mpl.cm.Blues
+        #min_val, max_val, n = 0.3, 1.0, 10
+        #colors = cmap(np.linspace(min_val, max_val, n))
+        #cmap = mpl.colors.LinearSegmentedColormap.from_list("cmap", colors)
 
-        norm = mpl.colors.Normalize(vmin = sub_df['-log10(FDR)'].min(), vmax = sub_df['-log10(FDR)'].max())
-        mapper = cm.ScalarMappable(norm = norm, cmap = cmap)
-        mapper.set_array([]) 
+        #norm = mpl.colors.Normalize(vmin = sub_df['-log10(FDR)'].min(), vmax = sub_df['-log10(FDR)'].max())
+        #mapper = cm.ScalarMappable(norm = norm, cmap = cmap)
+        #mapper.set_array([]) 
 
-        bp = sns.barplot(data = sub_df, 
-                         x = '-log10(FDR)', 
-                         y = 'term',
-                         palette = mapper.to_rgba(sub_df["-log10(FDR)"].values),
-                         ax=axs[count])
+        #minsize = min(sub_df['n_genes'])
+        #maxsize = max(sub_df['n_genes'])
+
+        bp = sns.scatterplot(data = sub_df, 
+                             x = '-log10(FDR)', 
+                             y = 'term',
+                             size = 'n_genes',
+                             sizes=(10, 100),
+                             hue = "n_genes",
+                             hue_norm=(0, 50),
+                             #palette = mapper.to_rgba(sub_df["-log10(FDR)"].values),
+                             ax=axs[count])
         bp.set_yticklabels([textwrap.fill(e, 40) for e in sub_df['term']])
         bp.set_title(go_class.replace("_", " ").title())
         bp.set_ylabel("")
+        bp.legend(loc='upper left', bbox_to_anchor=(1, 1), labelspacing=1, title='N. of Genes')
+        xlabels = ['{:,.1f}'.format(x) for x in bp.get_xticks()]
+        bp.set_xticklabels(xlabels)
         
-        cbar = plt.colorbar(mapper, shrink=0.50, ax=axs[count])
-        cbar.set_label('-log10(FDR)', rotation=270,labelpad=30)
+        #cbar = plt.colorbar(mapper, shrink=0.50, ax=axs[count], location='right')
+        #cbar.set_label('-log10(FDR)', rotation=270,labelpad=30)
         count += 1
         
     return fig    
@@ -207,6 +218,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         comparison_df = subset_df.filter(like=comparison)
         reg_col = [col for col in comparison_df if col.startswith('Regulation_')]
 
+        # significant up 
         sign_up = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Up"]
         up_gene_ids_list = sign_up.reset_index().gene_id.tolist()
         up_gene_ids_list_wona = [item for item in up_gene_ids_list if str(item) != 'nan']
@@ -217,6 +229,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         df.to_csv(folder_path / ("goterm_" + reference + '_' + comparison + "_up_go_term_results.csv"))
         fig.savefig(folder_path / ("goterm_" + reference + '_' + comparison + "_up_go_term_plot.pdf"), bbox_inches='tight')
 
+        # significant down
         sign_down = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Down"]
         down_gene_ids_list = sign_down.reset_index().gene_id.tolist()
         down_gene_ids_list_wona = [item for item in down_gene_ids_list if str(item) != 'nan']
@@ -226,5 +239,16 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         fig = create_go_plots(df)
         df.to_csv(folder_path / ("goterm_" + reference + '_' + comparison + "_down_go_term_results.csv"))
         fig.savefig(folder_path / ("goterm_" + reference + '_' + comparison + "_down_go_term_plot.pdf"), bbox_inches='tight')
+
+        # significant up and down 
+        sign_up_down = comparison_df.loc[comparison_df[reg_col[0]].isin(["Significant Up", "Significant Down"])]
+        up_down_gene_ids_list = sign_up_down.reset_index().gene_id.tolist()
+        up_down_gene_ids_list_wona = [item for item in up_down_gene_ids_list if str(item) != 'nan']
+        print("nas in UP:", len(up_down_gene_ids_list) - len(up_down_gene_ids_list_wona))
+
+        df = go_it(up_down_gene_ids_list_wona, goeaobj, GO_items, inv_map)
+        fig = create_go_plots(df)
+        df.to_csv(folder_path / ("goterm_" + reference + '_' + comparison + "_up_and_down_go_term_results.csv"))
+        fig.savefig(folder_path / ("goterm_" + reference + '_' + comparison + "_up_and_down_go_term_plot.pdf"), bbox_inches='tight')
     
     return "done"
