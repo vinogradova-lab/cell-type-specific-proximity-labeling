@@ -249,8 +249,8 @@ color_discrete_map = {'Significant Down': '#ff8080',
                       'Not Significant Down': '#ffcccc', 
                       'Significant but <1.5 FC': 'darkgrey', 
                       'Not Significant': 'lightgrey',
-                      'Significant Up': '#94c973',
-                      'Not Significant Up': '#d6f5d6' 
+                      'Significant Up': '#0096FF',
+                      'Not Significant Up': '#CDDEFA' 
                     }
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
@@ -322,7 +322,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             if r['Regulation'] == 'Significant Down':
                 color = '#ff8080'
             elif r['Regulation'] == 'Significant Up':
-                color = '#94c973'
+                color = '#0096FF'
         
             fig.add_annotation(x=r['log2_FC'],
                                y=r["-log10_pval"],
@@ -432,7 +432,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
                 if r['Regulation'] == 'Significant Down':
                     color = '#ff8080'
                 elif r['Regulation'] == 'Significant Up':
-                    color = '#94c973'
+                    color = '#0096FF'
         
                 fig.add_annotation(x=r['log2_FC'],
                                    y=r["-log10_pval"],
@@ -534,7 +534,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
             if r['Regulation'] == 'Significant Down':
                 color = '#ff8080'
             elif r['Regulation'] == 'Significant Up':
-                color = '#94c973'
+                color = '#0096FF'
         
             fig.add_annotation(x=r['log2_FC'],
                                y=r["-log10_pval"],
@@ -945,7 +945,7 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
     subset_for_heatmap = subset_for_heatmap.reset_index("uniprot_id")
     subset_for_heatmap = subset_for_heatmap.drop("uniprot_id", axis=1).set_index("description")
 
-    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 145, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
+    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 240, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     g.ax_row_dendrogram.set_visible(False)
     g.ax_col_dendrogram.set_visible(False)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize = 10)
