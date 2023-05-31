@@ -2,7 +2,7 @@
     "turbo_id_analysis_pipeline_paths":
     {
         "input_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/01_census_out_processing/15_files_turbo_id_1pepperprotein_052423/01_processed_files/",
-        "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_results/min_1_pep_per_protein",
+        "output_folder_path": "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_dontuse/min_1_pep_per_protein",
         "fasta_table_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/03_table_for_analysis/main_fasta_table_without_signal_p.csv"
     },
     "mouse_fasta_to_FP_TP_tables_paths":
@@ -13,6 +13,7 @@
         "mitomatrix_protein_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/NIHMS552295-supplement-Supplementary_Data_1.csv",
         "mart_export_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/mart_export(8).txt",
         "output_folder_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table",
-        "secretion_prediction_resource_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/Secretion_Prediction_Resource.csv"
+        "secretion_prediction_resource_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/Secretion_Prediction_Resource.csv",
+        "gene_id_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/03_geneid_mapping/uniprot-download_true_format_xlsx-2023.05.24-21.24.58.46.csv"
     }
 }

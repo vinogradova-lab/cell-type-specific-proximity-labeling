@@ -9,6 +9,16 @@ import scipy.stats as stat
 from functools import reduce
 from src.filter_funcs import get_condition_df
 
+color_discrete_map = {'Significant Up': '#ff8080', 
+                      'Not Significant Up': '#ffcccc', 
+                      'Significant but <1.5 FC': 'darkgrey', 
+                      'Not Significant': 'lightgrey',
+                      'Significant Down': '#71A0C6',
+                      'Not Significant Down': '#CDDEFA' 
+                    }
+
+color_heatmap_up = 240
+color_heatmap_down = 15 
 
 def get_detailed_protein_annotation(df, volcano_df, fasta_table): 
     df = df.reset_index().set_index("uniprot_id")
@@ -245,13 +255,7 @@ def get_expr(row):
     else:
         return "Not Significant"
 
-color_discrete_map = {'Significant Down': '#ff8080', 
-                      'Not Significant Down': '#ffcccc', 
-                      'Significant but <1.5 FC': 'darkgrey', 
-                      'Not Significant': 'lightgrey',
-                      'Significant Up': '#94c973',
-                      'Not Significant Up': '#d6f5d6' 
-                    }
+
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
     volcano_plot_list = []
@@ -306,7 +310,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
         fig.add_vline(x=0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
-        fig.update_layout(legend=dict(title=""), title_x=0.5)
+        fig.update_layout(legend=dict(title=""), title_x=0.5, font_family="Arial")
         
         fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
@@ -320,9 +324,9 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
 
         for i,r in labels_df.iterrows():
             if r['Regulation'] == 'Significant Down':
-                color = '#ff8080'
+                color = color_discrete_map['Significant Down'] 
             elif r['Regulation'] == 'Significant Up':
-                color = '#94c973'
+                color = color_discrete_map['Significant Up'] 
         
             fig.add_annotation(x=r['log2_FC'],
                                y=r["-log10_pval"],
@@ -415,7 +419,7 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             fig.add_vline(x=0.58, line_width=2, line_dash="dash", line_color="grey")
             fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
             fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
-            fig.update_layout(legend=dict(title=""), title_x=0.5)
+            fig.update_layout(legend=dict(title=""), title_x=0.5, font_family="Arial")
             
             
             fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
@@ -430,9 +434,9 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
 
             for i,r in labels_df.iterrows():
                 if r['Regulation'] == 'Significant Down':
-                    color = '#ff8080'
+                    color = color_discrete_map['Significant Down'] 
                 elif r['Regulation'] == 'Significant Up':
-                    color = '#94c973'
+                    color = color_discrete_map['Significant Up'] 
         
                 fig.add_annotation(x=r['log2_FC'],
                                    y=r["-log10_pval"],
@@ -518,7 +522,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         fig.add_vline(x=0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_vline(x=-0.58, line_width=2, line_dash="dash", line_color="grey")
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
-        fig.update_layout(legend=dict(title=""), title_x=0.5)
+        fig.update_layout(legend=dict(title=""), title_x=0.5, font_family="Arial")
         
         fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
@@ -532,9 +536,9 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
 
         for i,r in labels_df.iterrows():
             if r['Regulation'] == 'Significant Down':
-                color = '#ff8080'
+                color = color_discrete_map['Significant Down'] 
             elif r['Regulation'] == 'Significant Up':
-                color = '#94c973'
+                color = color_discrete_map['Significant Up'] 
         
             fig.add_annotation(x=r['log2_FC'],
                                y=r["-log10_pval"],
@@ -945,7 +949,7 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
     subset_for_heatmap = subset_for_heatmap.reset_index("uniprot_id")
     subset_for_heatmap = subset_for_heatmap.drop("uniprot_id", axis=1).set_index("description")
 
-    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 145, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
+    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(color_heatmap_up, color_heatmap_down, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     g.ax_row_dendrogram.set_visible(False)
     g.ax_col_dendrogram.set_visible(False)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize = 10)
@@ -953,7 +957,7 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
     g.ax_cbar.set_ylabel("z-score",size=15)
     g.ax_cbar.set_position((0.1, .2, .03, .4))
 
-    g.savefig(folder_path / "signupdown_cond_heatmap.pdf", dpi=400)
+    g.savefig(folder_path / "heatmap_signupdown_cond.pdf", dpi=400)
     subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
     return "done"
  

@@ -8,6 +8,7 @@ import json
 from functools import reduce 
 from operator import concat
 from src.fasta_table_funcs import *
+from src.go_funcs import * 
 %load_ext autoreload
 %autoreload 2
 
@@ -27,6 +28,7 @@ mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path'])
 mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
 secretion_prediction_resource_path = Path(paths_dict['secretion_prediction_resource_path'])
+#gene_id_path = Path(paths_dict['gene_id_path'])
 
 # %% 
 spr_df = pd.read_csv(secretion_prediction_resource_path)
@@ -94,7 +96,7 @@ merged_main_fasta_table.shape
 # check if initial number of proteins is the same
 assert initial_number_of_entires == len(merged_main_fasta_table)
 
-
+# %% 
 #crossreference with secretion prediction resource shared by Corey 
 sp_list = spr_df.reset_index().uniprot_sp_key.tolist()
 merged_main_fasta_table = merged_main_fasta_table.reset_index()
@@ -130,7 +132,7 @@ mouse_mitomatrix_genes_list = mitomatrix_mart_merge_df["Mouse gene name"].tolist
 # %%
 # annotate TP and FP
 # merged_main_fasta_table = merged_main_fasta_table.reset_index()
-merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP_signalp, axis=1) 
+merged_main_fasta_table["TP"] = merged_main_fasta_table.apply(annotate_TP, axis=1) 
 
 # %% 
 # merged_main_fasta_table["FP"] = merged_main_fasta_table["Subcellular location [CC]"].apply(annotate_FP) 
@@ -141,9 +143,12 @@ print(merged_main_fasta_table["FP"].value_counts())
 
 # %%
 # clean up annotation 
-merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation_signalp, axis=1) 
+merged_main_fasta_table["annotation"] = merged_main_fasta_table.apply(conclude_annotation, axis=1) 
 merged_main_fasta_table["annotation"].value_counts()
 
+# %% 
+assert len(merged_main_fasta_table.loc[merged_main_fasta_table["annotation"] == "TP"]) == 2806
+assert len(merged_main_fasta_table.loc[merged_main_fasta_table["annotation"] == "FP"]) == 435
 # %%
 # this is not necessary 
 # double check that there are no FPs with Signal peptide annotation
@@ -170,6 +175,47 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 print(merged_main_fasta_table.shape)
 merged_main_fasta_table.head()
 
+# %% 
+merged_main_fasta_table['gene_name'] = merged_main_fasta_table.description.str.split("GN=").str[1]
+
+# %% 
+GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
+#obodag, ns2assoc = initialize_godag_obj(file_gene2go)
+#goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
+#GO_items = get_all_goterms(goeaobj)
+
+# %% 
+gene_id_df = pd.DataFrame.from_dict(inv_map, orient='index',columns=['gene_name']).reset_index().rename(columns={'index':'gene_id'})
+
+# %% 
+merged_main_fasta_table = merged_main_fasta_table.reset_index().merge(gene_id_df, on='gene_name', how="left")
+
+# %% 
+merged_main_fasta_table = merged_main_fasta_table.set_index("uniprot_id")
+
+# %% 
+assert merged_main_fasta_table.gene_id.count() == 17926
+# %% 
+# this did not work so well 
+# add gene id column 
+#gene_id_df = pd.read_csv(gene_id_path)
+#gene_id_df.columns = ["uniprot_id", "gene_id"]
+#gene_id_df = gene_id_df.set_index("uniprot_id")
+#gene_id_df['gene_id']= gene_id_df['gene_id'].astype(str)
+#gene_id_df = gene_id_df.reset_index().groupby('uniprot_id')['gene_id'].apply(list).reset_index().set_index("uniprot_id")
+#gene_id_df = gene_id_df['gene_id'].apply(', '.join).reset_index().set_index("uniprot_id")
+#gene_id_df["alterantive_gene_id"] = gene_id_df["gene_id"].str.split(", ", 1).str[1]
+#gene_id_df["gene_id"] = gene_id_df["gene_id"].str.split(", ", 1).str[0]
+#merged_main_fasta_table = merged_main_fasta_table.join(gene_id_df, how="left")
+
+# %%
+assert initial_number_of_entires == len(merged_main_fasta_table)
+
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_without_signal_p.csv")
+# %%
+#df = pd.DataFrame.from_dict(inv_map, orient='index', columns=["gene_name"]).reset_index()
+#df.columns = ["gene_id", "gene_symbol"]
+#fasta_table["gene_symbol"] = fasta_table["description"].str.split("GN=", 1).str[1]
+#fasta_table.merge(df, on="gene_symbol", how="left").to_csv("test.csv")

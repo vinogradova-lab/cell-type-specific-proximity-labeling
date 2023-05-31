@@ -7,10 +7,10 @@ def remove_duplicates_from_aggregate(row):
         row[col] = ', '.join(map(str, set(row[col])))
     return row
 
-def annotate_TP(subcelullar_location):
-    tp_term_list = ["Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
+def annotate_TP(row):
+    tp_term_list = ["Endoplasmic Reticulum", "Endoplasmic reticulum", "Secreted", "secreted", "Rough endoplasmic reticulum", "endoplasmic reticulum"]
+    subcelullar_location = str(row["Subcellular location [CC]"])
     #"Golgi", "Extracellular space", "extracellular space", 
-    #
     subcelullar_location = str(subcelullar_location)
     if "Note:" in subcelullar_location:
         subcelullar_location = subcelullar_location.split("Note:")[0]
