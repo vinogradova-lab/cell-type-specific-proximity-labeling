@@ -27,7 +27,6 @@ warnings.filterwarnings('ignore')
 
 sns.set(font="Arial")
 sns.set_style("ticks")
-fig.layout.font.family = 'Arial'
 
 # %% 
 # read in paths from json
