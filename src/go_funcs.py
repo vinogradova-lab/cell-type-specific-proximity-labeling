@@ -179,7 +179,6 @@ def create_go_plots(df):
 
         #minsize = min(sub_df['n_genes'])
         #maxsize = max(sub_df['n_genes'])
-
         bp = sns.scatterplot(data = sub_df, 
                              x = '-log10(FDR)', 
                              y = 'term',
@@ -188,11 +187,12 @@ def create_go_plots(df):
                              hue = "n_genes",
                              hue_norm=(0, 50),
                              #palette = mapper.to_rgba(sub_df["-log10(FDR)"].values),
-                             ax=axs[count])
+                             ax=axs[count],
+                             zorder=1)
         bp.set_yticklabels([textwrap.fill(e, 40) for e in sub_df['term']])
         bp.set_title(go_class.replace("_", " ").title())
         bp.set_ylabel("")
-        bp.legend(loc='upper left', bbox_to_anchor=(1, 1), labelspacing=1, title='N. of Genes')
+        bp.legend(loc='upper left', bbox_to_anchor=(1, 1), labelspacing=1, title='N. of genes')
         xlabels = ['{:,.1f}'.format(x) for x in bp.get_xticks()]
         bp.set_xticklabels(xlabels)
         
