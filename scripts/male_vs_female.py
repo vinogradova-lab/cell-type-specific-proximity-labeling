@@ -2,17 +2,26 @@
 import pandas as pd 
 from pathlib import Path
 import seaborn as sns
+import numpy as np
+from sklearn.decomposition import PCA
+import plotly.express as px
 
 # %%
-filt_male_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_results/min_1_pep_per_protein/02_filtering_per_cond_per_file/20230512_EV2-28A/passed_filter_processed_census-out_20230512_EV2-28A.csv")
-filt_female_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_results/min_1_pep_per_protein/02_filtering_per_cond_per_file/20230513_EV2-28B/passed_filter_processed_census-out_20230513_EV2-28B.csv")
+filt_male_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/02_filtering_per_cond_per_file/20230512_EV2-28A/passed_filter_processed_census-out_20230512_EV2-28A.csv")
+filt_female_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/02_filtering_per_cond_per_file/20230513_EV2-28B/passed_filter_processed_census-out_20230513_EV2-28B.csv")
 
-filt_norm_male_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_results/min_1_pep_per_protein/04_normalized/20230512_EV2-28A.csv")
-filt_norm_female_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_results/min_1_pep_per_protein/04_normalized/20230513_EV2-28B.csv")
+filt_norm_male_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/04_normalized/20230512_EV2-28A.csv")
+filt_norm_female_path = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/04_normalized/20230513_EV2-28B.csv")
 
-filt_norm_roc_male_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_dontuse/min_1_pep_per_protein/05_results/01_tissue/20230512_EV2-28A/final_protein_table_20230512_EV2-28A.csv"
-filt_norm_roc_female_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/052423_dontuse/min_1_pep_per_protein/05_results/01_tissue/20230513_EV2-28B/final_protein_table_20230513_EV2-28B.csv"
+filt_norm_roc_male_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/05_results/01_tissue/20230512_EV2-28A/final_protein_table_20230512_EV2-28A.csv"
+filt_norm_roc_female_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/05_results/01_tissue/20230513_EV2-28B/final_protein_table_20230513_EV2-28B.csv"
 
+
+# %% 
+output = Path("/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/053123_results_without_signalp/min_1_pep_per_protein/05_results")
+folder_path = output / "male_vs_female"
+if not os.path.exists(folder_path):
+    os.mkdir(folder_path)
 # %%
 def channel_ratio_suffix(file_path, suffix, only_cre_plus=False):
     df = pd.read_csv(file_path) 
@@ -110,7 +119,7 @@ def get_pca_plot(df, title_string, color_list): #df needs to be without log
                       height=500, width=600, showlegend=True)
     return(fig)
 
-def get_heatmap(df, treatment_labelling, file_name):
+def get_heatmap(df, treatment_labelling, file_name, folder_path):
     subset_for_heatmap = df.filter(like=treatment_labelling, axis=1)
     cols_list = subset_for_heatmap.columns.tolist()
     subset_for_heatmap = subset_for_heatmap.reset_index().drop(["pep_num", "annotation", "uniprot_id"], axis=1) #.set_index("description")
@@ -119,7 +128,7 @@ def get_heatmap(df, treatment_labelling, file_name):
     subset_for_heatmap.dropna(inplace=True)
     subset_for_heatmap = subset_for_heatmap.set_index("description")
 
-    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(15, 145, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
+    g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(240, 15, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     #g.ax_row_dendrogram.set_visible(False)
     #g.ax_col_dendrogram.set_visible(False)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize = 10)
@@ -127,32 +136,45 @@ def get_heatmap(df, treatment_labelling, file_name):
     g.ax_cbar.set_ylabel("z-score",size=15)
     g.ax_cbar.set_position((0.1, .2, .03, .4))
 
-    #g.savefig("heatmap_malevsfemale.pdf", dpi=400)
+    g.savefig(folder_path / (file_name + ".pdf"), dpi=400)
     #subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
     return "done"
 
 # %% 
-color_list = ["lightgreen", "green", "lightblue", "blue", "gold", "orange"]
-filt_male_df = channel_ratio_suffix(filt_male_path, "male")
-filt_female_df = channel_ratio_suffix(filt_female_path, "female")
-filt_merged = filt_male_df.join(filt_female_df, how="outer")
-get_pca_plot(filt_merged, "PCA", color_list)
-# %%
-filt_male_df = channel_ratio_suffix(filt_norm_male_path, "male")
-filt_female_df = channel_ratio_suffix(filt_norm_female_path, "female")
-filt_merged = filt_male_df.join(filt_female_df, how="outer")
-get_pca_plot(filt_merged, "PCA", color_list)
-filt_merged.to_csv("filt_merged_after_roc.csv")
+
+def get_df_pca_heatmap(male_path, female_path, folder_path, color_list, file_name, only_cre=None):
+    if only_cre:
+        filt_male_df = channel_ratio_suffix(male_path, "male", True)
+        filt_female_df = channel_ratio_suffix(female_path, "female", True)
+    else:
+        filt_male_df = channel_ratio_suffix(male_path, "male")
+        filt_female_df = channel_ratio_suffix(female_path, "female")
+    filt_merged = filt_male_df.join(filt_female_df, how="outer")
+    filt_merged.to_csv(folder_path / (file_name + ".csv"))
+    fig = get_pca_plot(filt_merged, file_name, color_list)
+    fig.write_image(folder_path / (file_name + ".png"))
+    get_heatmap(filt_merged, '(+)', file_name, folder_path)
+    return('done')
 
 # %% 
-filt_male_df = channel_ratio_suffix(filt_norm_roc_male_path, "male")
-filt_female_df = channel_ratio_suffix(filt_norm_roc_female_path, "female")
-filt_merged = filt_male_df.join(filt_female_df, how="outer")
-get_pca_plot(filt_merged, "PCA", color_list)
-get_heatmap(filt_merged, '(+)', "male vs female")
+color_list = ["lightgreen", "green", "lightblue", "blue", "gold", "orange"]
+#get_df_pca_heatmap(filt_male_path, filt_female_path, folder_path, color_list, "filtered_channel_ratio_male_vs_female")
+get_df_pca_heatmap(filt_norm_male_path, filt_norm_female_path, folder_path, color_list, "filtered_norm_channel_ratio_male_vs_female")
+
+# %%
+get_df_pca_heatmap(filt_norm_roc_male_path, filt_norm_roc_female_path, folder_path, color_list, "filtered_norm_channel_ratio_male_vs_female")
 
 # %%
 color_list = ["green", "blue", "orange"]
+#get_df_pca_heatmap(filt_male_path, filt_female_path, folder_path, color_list, "filtered_channel_ratio_male_vs_female_only_cre", True)
+get_df_pca_heatmap(filt_norm_male_path, filt_norm_female_path, folder_path, color_list, "filtered_norm_channel_ratio_male_vs_female_only_cre", True)
+
+# %%
+get_df_pca_heatmap(filt_norm_roc_male_path, filt_norm_roc_female_path, folder_path, color_list, "filtered_norm_channel_ratio_male_vs_female_only_cre", True)
+
+
+
+# %%
 filt_male_df = channel_ratio_suffix(filt_male_path, "male", True)
 filt_female_df = channel_ratio_suffix(filt_female_path, "female", True)
 filt_merged = filt_male_df.join(filt_female_df, how="outer")
