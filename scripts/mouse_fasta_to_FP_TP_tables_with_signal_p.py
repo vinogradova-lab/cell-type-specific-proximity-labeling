@@ -9,6 +9,7 @@ from functools import reduce
 from operator import concat
 from src.fasta_table_funcs import *
 from src.go_funcs import * 
+import math
 %load_ext autoreload
 %autoreload 2
 
@@ -28,7 +29,19 @@ mitomatrix_protein_path = Path(paths_dict['mitomatrix_protein_path'])
 mart_export_path = Path(paths_dict['mart_export_path']) 
 output_folder_path = Path(paths_dict['output_folder_path']) 
 secretion_prediction_resource_path = Path(paths_dict['secretion_prediction_resource_path'])
-#gene_id_path = Path(paths_dict['gene_id_path'])
+human_mouse_homology_mapping_path = Path(paths_dict['human_mouse_homology_mapping_path'])
+
+# %% 
+human_mouse_homology_mapping_df = pd.read_csv(human_mouse_homology_mapping_path, delimiter="\t")
+human_mouse_homology_mapping_df = human_mouse_homology_mapping_df[["DB Class Key", "Common Organism Name", "SWISS_PROT IDs", "Symbol"]].drop_duplicates()
+mouse_df = human_mouse_homology_mapping_df.loc[human_mouse_homology_mapping_df["Common Organism Name"] == 'mouse, laboratory'].set_index("DB Class Key").add_suffix("_mouse")
+human_df = human_mouse_homology_mapping_df.loc[human_mouse_homology_mapping_df["Common Organism Name"] == 'human'].set_index("DB Class Key").add_suffix("_human")
+human_df = human_df.reset_index().groupby("DB Class Key").agg(list)
+for col in human_df.columns: 
+    human_df[col] = [','.join(map(str, l)) for l in human_df[col]]
+
+human_mouse_homology_mapping_rearranged_df = mouse_df.join(human_df)
+human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df[["SWISS_PROT IDs_mouse", "Symbol_mouse", "SWISS_PROT IDs_human", "Symbol_human"]].reset_index().add_suffix("_jackson_homology_db")
 
 # %% 
 spr_df = pd.read_csv(secretion_prediction_resource_path)
@@ -212,6 +225,28 @@ assert merged_main_fasta_table.gene_id.count() == 17926
 # %% 
 assert initial_number_of_entires == len(merged_main_fasta_table)
 
+# %% 
+#human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.drop_duplicates()
+maping_dict = human_mouse_homology_mapping_rearranged_df[["SWISS_PROT IDs_mouse_jackson_homology_db", "DB Class Key_jackson_homology_db"]]
+maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"] = maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(",")
+maping_dict = maping_dict.explode("SWISS_PROT IDs_mouse_jackson_homology_db")
+maping_dict = maping_dict.drop_duplicates().dropna()
+mapping_dict = pd.Series(maping_dict["DB Class Key_jackson_homology_db"].values,index=maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"]).to_dict() #human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"] = human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(',')
+#mapping_dict_lists = {key: [val for val in str(value).split(",")] for key, value in mapping_dict.items()}
+# %% 
+
+def add_db_key(uniprot_id, mapping_dict):
+    if uniprot_id in mapping_dict.keys():
+        return mapping_dict[uniprot_id]
+
+
+# %% 
+merged_main_fasta_table  = merged_main_fasta_table.reset_index()
+merged_main_fasta_table["DB Class Key_jackson_homology_db"] = merged_main_fasta_table["uniprot_id"].apply(add_db_key, args=(mapping_dict, ))
+#human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.explode("SWISS_PROT IDs_mouse_jackson_homology_db")
+#human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.rename(columns = {"SWISS_PROT IDs_mouse_jackson_homology_db" : 'uniprot_id'})
+# %% 
+merged_main_fasta_table = merged_main_fasta_table.merge(human_mouse_homology_mapping_rearranged_df, on="DB Class Key_jackson_homology_db", how="left")
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_with_signal_p.csv")
