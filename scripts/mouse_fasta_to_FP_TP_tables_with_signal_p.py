@@ -190,7 +190,8 @@ print(merged_main_fasta_table.shape)
 merged_main_fasta_table.head()
 
 # %% 
-merged_main_fasta_table['gene_name'] = merged_main_fasta_table.description.str.split("GN=").str[1]
+merged_main_fasta_table['gene_name'] = merged_main_fasta_table["Gene Names"].str.split(" ").str[0] 
+
 
 # %% 
 GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
@@ -208,7 +209,7 @@ merged_main_fasta_table = merged_main_fasta_table.reset_index().merge(gene_id_df
 merged_main_fasta_table = merged_main_fasta_table.set_index("uniprot_id")
 
 # %% 
-assert merged_main_fasta_table.gene_id.count() == 17926
+assert merged_main_fasta_table.gene_id.count() == 18564
 
 # %% 
 # add gene id column 
@@ -227,26 +228,38 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 
 # %% 
 #human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.drop_duplicates()
-maping_dict = human_mouse_homology_mapping_rearranged_df[["SWISS_PROT IDs_mouse_jackson_homology_db", "DB Class Key_jackson_homology_db"]]
+maping_dict = human_mouse_homology_mapping_rearranged_df[["Symbol_mouse_jackson_homology_db", "DB Class Key_jackson_homology_db", "SWISS_PROT IDs_mouse_jackson_homology_db"]]
+gene_name_mapping_dict = pd.Series(maping_dict["DB Class Key_jackson_homology_db"].values,index=maping_dict["Symbol_mouse_jackson_homology_db"]).to_dict() #human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"] = human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(',')
+
 maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"] = maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(",")
 maping_dict = maping_dict.explode("SWISS_PROT IDs_mouse_jackson_homology_db")
 maping_dict = maping_dict.drop_duplicates().dropna()
-mapping_dict = pd.Series(maping_dict["DB Class Key_jackson_homology_db"].values,index=maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"]).to_dict() #human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"] = human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(',')
+uniprot_mapping_dict = pd.Series(maping_dict["DB Class Key_jackson_homology_db"].values,index=maping_dict["SWISS_PROT IDs_mouse_jackson_homology_db"]).to_dict() #human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"] = human_mouse_homology_mapping_rearranged_df["SWISS_PROT IDs_mouse_jackson_homology_db"].str.split(',')
+
 #mapping_dict_lists = {key: [val for val in str(value).split(",")] for key, value in mapping_dict.items()}
 # %% 
 
-def add_db_key(uniprot_id, mapping_dict):
-    if uniprot_id in mapping_dict.keys():
-        return mapping_dict[uniprot_id]
+def add_db_key(df, uniprot_mapping_dict, gene_name_mapping_dict):
+    gene_name = df["gene_name"] 
+    uniprot_id = df["uniprot_id"]
+    if uniprot_id in uniprot_mapping_dict.keys():
+        return uniprot_mapping_dict[uniprot_id]
+    elif gene_name in gene_name_mapping_dict: 
+        return gene_name_mapping_dict[gene_name]
 
 
 # %% 
 merged_main_fasta_table  = merged_main_fasta_table.reset_index()
-merged_main_fasta_table["DB Class Key_jackson_homology_db"] = merged_main_fasta_table["uniprot_id"].apply(add_db_key, args=(mapping_dict, ))
+merged_main_fasta_table["DB Class Key_jackson_homology_db"] = merged_main_fasta_table.apply(add_db_key, args=(uniprot_mapping_dict, gene_name_mapping_dict), axis=1)
 #human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.explode("SWISS_PROT IDs_mouse_jackson_homology_db")
 #human_mouse_homology_mapping_rearranged_df = human_mouse_homology_mapping_rearranged_df.rename(columns = {"SWISS_PROT IDs_mouse_jackson_homology_db" : 'uniprot_id'})
 # %% 
 merged_main_fasta_table = merged_main_fasta_table.merge(human_mouse_homology_mapping_rearranged_df, on="DB Class Key_jackson_homology_db", how="left")
+
+# %% 
+assert initial_number_of_entires == len(merged_main_fasta_table)
+
 # %%
 # save final table 
 merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_with_signal_p.csv")
+# %%
