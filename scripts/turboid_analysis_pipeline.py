@@ -16,6 +16,7 @@ from src.filter_funcs import *
 from src.norm_funcs import *
 from src.readin_funcs import *
 from src.go_funcs import * 
+from src.figure_parameters import * 
 import logging
 import subprocess 
 import warnings 
@@ -24,9 +25,6 @@ import itertools
 warnings.filterwarnings('ignore')
 %load_ext autoreload
 %autoreload 2
-
-sns.set(font="Arial")
-sns.set_style("ticks")
 
 # %% 
 # read in paths from json
