@@ -14,6 +14,7 @@
         "mart_export_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/00_mitomatrix_proteins/mart_export(8).txt",
         "output_folder_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table",
         "secretion_prediction_resource_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/Secretion_Prediction_Resource.csv",
-        "human_mouse_homology_mapping_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/03_human_uniprot/HOM_MouseHumanSequence.rpt"
+        "human_mouse_homology_mapping_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/main_fasta_table/03_human_uniprot/HOM_MouseHumanSequence.rpt",
+        "gprofiler_mouse_geneid_mapping_path": "/Users/nropek/Documents/01_data_analysis_folders/05_TurboID/turboid/data/gProfiler_mmusculus_6-6-2023_1-49-49 PM.csv"
     }
 }
