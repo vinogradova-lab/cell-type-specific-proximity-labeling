@@ -21,7 +21,7 @@ with open('paths.json') as paths_file:
 
 paths_json = json.loads(file_contents)
 paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
-with_signalp = True
+with_signalp = False
 
 # %%
 # read in all paths 
@@ -111,7 +111,7 @@ assert initial_number_of_entires == len(merged_main_fasta_table)
 print("Human uniprot ids from jacksons db added!")
 
 # %% 
-assert merged_main_fasta_table["DB Class Key_jackson_homology_db"].count() == 19272
+assert merged_main_fasta_table["DB Class Key_jackson_homology_db"].count() == 19273
 
 # %%
 # save final table 
@@ -120,5 +120,5 @@ if with_signalp:
 else:
     merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_without_signal_p.csv")
 
-print("File saved!")
+print("File saved, with signalp = ", with_signalp)
 # %%
