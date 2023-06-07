@@ -188,7 +188,7 @@ def create_go_plots(df):
                              size = 'n_genes',
                              sizes=(10, 100),
                              hue = "n_genes",
-                             hue_norm=(0, 50),
+                             hue_norm=(sub_df.n_genes.min(), sub_df.n_genes.max()),
                              #palette = mapper.to_rgba(sub_df["-log10(FDR)"].values),
                              ax=axs[count],
                              zorder=1)

@@ -23,7 +23,6 @@ import warnings
 import kaleido
 import itertools
 warnings.filterwarnings('ignore')
-warnings.filterwarnings('ignore', message="posx and posy should be finite values")
 %load_ext autoreload
 %autoreload 2
 
