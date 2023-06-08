@@ -106,10 +106,10 @@ for file in list_of_file_paths:
     
     # annotate TP FP
     df = df.reset_index()
-    df = df.rename(columns={"uniprot": "Entry"})
-    merged = df.merge(fasta_table[["annotation", "Entry"]], on="Entry", how="left")
-    merged = merged.drop_duplicates()
-    merged = merged.rename(columns={"Entry": "uniprot_id"})
+    df = df.rename(columns={"uniprot": "uniprot_id"})
+    merged = df.merge(fasta_table[["annotation"]].reset_index(), on="uniprot_id", how="left")
+    #merged = merged.drop_duplicates()
+    #merged = merged.rename(columns={"Entry": "uniprot_id"})
 
     assert after_keratin_removal == len(merged)
 
