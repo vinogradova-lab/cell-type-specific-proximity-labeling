@@ -40,15 +40,22 @@ commit_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).de
 input_folder_path = Path(paths_dict['input_folder_path'])
 output_folder_path = Path(paths_dict['output_folder_path'])
 fasta_table_path = Path(paths_dict['fasta_table_path'])
-logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', filemode='w', encoding='utf-8', level=logging.INFO)
-logging.info(commit_sha)
+logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', 
+                    filemode='w', 
+                    encoding='utf-8', 
+                    level=logging.INFO, 
+                    format='%(asctime)s %(message)s', 
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.info('Program starting')
+logging.info('Gitcommit sha: %s', commit_sha)
 
 # %%
 # read in fasta table containing TP and FP annotation 
-fasta_table = pd.read_csv(fasta_table_path, index_col=[0])
+fasta_table = pd.read_csv(fasta_table_path, index_col=[1])
 TP_list = fasta_table[fasta_table["annotation"] == "TP"]
 FP_list = fasta_table[fasta_table["annotation"] == "FP"]
 
+logging.info("Annotation table used (contains TP and FP lists): %s", fasta_table_path.stem)
 logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
 logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
 
@@ -65,7 +72,7 @@ file_channel_dict = get_channel_name_dict(input_folder_path, list_of_file_names)
 file_condition_dict = get_cond_info(input_folder_path, list_of_file_names)
 
 logging.info("Number of files: %s", len(list_of_file_names))
-logging.info(list_of_file_names)
+logging.info("List of Files: %s", list_of_file_names)
 
 assert len(file_channel_dict) == len(list_of_file_names) == len(file_condition_dict)
 
@@ -79,7 +86,7 @@ if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
 logging.info('\n')
-logging.info("Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate TP and FP")
+logging.info("Assiging new column names according to metadata_col.csv, removing keratins in each file and annotating TP and FP proteins")
 
 dfs_dict = {}
 for file in list_of_file_paths:
@@ -99,10 +106,10 @@ for file in list_of_file_paths:
     
     # annotate TP FP
     df = df.reset_index()
-    df = df.rename(columns={"uniprot": "Entry"})
-    merged = df.merge(fasta_table[["annotation", "Entry"]], on="Entry", how="left")
-    merged = merged.drop_duplicates()
-    merged = merged.rename(columns={"Entry": "uniprot_id"})
+    df = df.rename(columns={"uniprot": "uniprot_id"})
+    merged = df.merge(fasta_table[["annotation"]].reset_index(), on="uniprot_id", how="left")
+    #merged = merged.drop_duplicates()
+    #merged = merged.rename(columns={"Entry": "uniprot_id"})
 
     assert after_keratin_removal == len(merged)
 
@@ -119,7 +126,7 @@ if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
 logging.info('\n')
-logging.info("Filter based on cre+ channels per condition per file")
+logging.info("Filtering based on cre+ channels per condition per file")
 
 filtered_dict = {}
 for file_name in list_of_file_names:
@@ -163,6 +170,7 @@ for file_name in list_of_file_names:
     filtered_out_df = filtered_out_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
     filtered_out_df.to_csv(file_folder_path / ("removed_" + file_name + ".csv"))
 
+logging.info("FOLDER COMPLETE: 02_filtering_per_cond_per_file")
 
 # %%
 # (1) generate the output put with raw SI and annotation TP/FP; 
@@ -176,7 +184,7 @@ if not os.path.exists(folder_path):
     os.mkdir(folder_path)
 
 logging.info('\n')
-logging.info("Creating normalized tables and normalisation plots")
+logging.info("Creating normalized data tables and normalization plots")
 
 normalized_dict = {}
 for file_name in list_of_file_names:
@@ -243,8 +251,13 @@ for file_name in list_of_file_names:
         for fig in plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
+logging.info("FOLDER COMPLETE: 03_normalisation_plots")
+
 # %%
 # save normalized df in folder
+logging.info('\n')
+logging.info("Saving normalized tables")
+
 folder_path = output_folder_path / "04_normalized"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -253,15 +266,22 @@ for file_name in list_of_file_names:
     df = normalized_dict[file_name]
     df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
 
+logging.info("FOLDER COMPLETE: 04_normalized")
+
 # %% 
 # Initialization for go term analysis 
+logging.info('\n')
+logging.info("Starting initialization for go term analysis")
 GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
 obodag, ns2assoc = initialize_godag_obj(file_gene2go)
 goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
 GO_items = get_all_goterms(goeaobj)
 
-# %% 
+ # %% 
 # split tissue and serum 
+logging.info('\n')
+logging.info("Starting individual analysis for tissue and serum files...")
+
 folder_path = output_folder_path / "05_results"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -282,6 +302,9 @@ for file_name in list_of_file_names:
     treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
     file_type = file_condition_dict[file_name]["file_type"]
     cutoff_dict = {}
+    
+    logging.info('\n')
+    logging.info("Processing file: %s", file_name)
     
     if file_type == "serum": 
         serum_file_folder_path = serum_folder_path / file_name.split("processed_census-out_")[1]
@@ -399,5 +422,5 @@ for file_name in list_of_file_names:
             GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
             get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
 
-
-# %%
+logging.info('\n')
+logging.info("Program finished")

@@ -190,7 +190,7 @@ Temporary Items
 
 #huge files which dont need to be on github
 fasta_files/
-data/
+random/
 results/
 
 .vscode/*

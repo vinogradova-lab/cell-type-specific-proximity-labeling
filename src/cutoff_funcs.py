@@ -642,13 +642,13 @@ def get_ratios_and_cutoffs(df,
     columns_list_df_all = df_all_list_columns_passcutoff #df_all_list_columns_TPRFPR
     columns_list_df_all.append("uniprot_id")
         
-    ratio_and_signal_intensity = ratio_and_signal_intensity.rename(columns={"uniprot_id": "Entry"})
+    #ratio_and_signal_intensity = ratio_and_signal_intensity.rename(columns={"uniprot_id": "Entry"})
     ratio_and_signal_intensity.drop('description', axis=1, inplace=True)
-    fasta_table = fasta_table.rename(columns={"uniprot_id": "alias_uniprot_id"})
+    #fasta_table = fasta_table.rename(columns={"uniprot_id": "alias_uniprot_id"})
 
-    merged_with_metadata = pd.merge(ratio_and_signal_intensity, fasta_table, on=["Entry", "annotation"], how="left")
-    merged_with_metadata = merged_with_metadata.rename(columns={"Entry": "uniprot_id"})
-    merged_with_metadata = merged_with_metadata.drop_duplicates(subset='uniprot_id', keep='first')
+    merged_with_metadata = pd.merge(ratio_and_signal_intensity, fasta_table, on=["uniprot_id", "annotation"], how="left")
+    #merged_with_metadata = merged_with_metadata.rename(columns={"Entry": "uniprot_id"})
+    #merged_with_metadata = merged_with_metadata.drop_duplicates(subset='uniprot_id', keep='first')
     
     ratio_and_signal_intensity_merged = pd.merge(merged_with_metadata, df_all[columns_list_df_all],on=["uniprot_id"], how="outer")
     

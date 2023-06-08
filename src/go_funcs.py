@@ -15,6 +15,7 @@ import seaborn as sns
 import textwrap
 from pathlib import Path
 import sys
+import logging
 
 def read_in_ncbi_go_associations_data():
     # NCBI Mouse data and GO data was Downloaded on May 17 2023
@@ -38,14 +39,12 @@ def read_in_ncbi_go_associations_data():
 
     # import py as gneid2nt_mus
     from genes_ncbi_10090_proteincoding import GENEID2NT as GeneID2nt_mus
-    print(len(GeneID2nt_mus))
 
     # map gene ids to gene name
     mapper = {}
     for key in GeneID2nt_mus:
         mapper[GeneID2nt_mus[key].Symbol] = GeneID2nt_mus[key].GeneID 
     inv_map = {v: k for k, v in mapper.items()}
-    print(len(inv_map))
         
     # download go data
     try:
@@ -65,6 +64,8 @@ def read_in_ncbi_go_associations_data():
 def initialize_godag_obj(file_gene2go):
     # Initialize GODag object
     obodag = GODag("go-basic.obo")
+    logging.info("Loading Ontologies...")
+    logging.info("go-basic.obo from Gene Ontology Consortium website: %s GO terms", len(obodag))
 
     # Read NCBI's gene2go. Store annotations in a list of namedtuples
     objanno = Gene2GoReader(file_gene2go, taxids=[10090])
@@ -72,31 +73,33 @@ def initialize_godag_obj(file_gene2go):
     # Get associations for each branch of the GO DAG (BP, MF, CC)
     ns2assoc = objanno.get_ns2assc()
 
+    logging.info("Loading Associations...")
     for nspc, id2gos in ns2assoc.items():
-        print("{NS} {N:,} annotated mouse genes".format(NS=nspc, N=len(id2gos)))
+        logging.info("{NS} {N:,} annotated mouse genes".format(NS=nspc, N=len(id2gos)))
 
     # subset mouse genome to only proteins/genes in experiment 
     return obodag, ns2assoc
 
 
 def create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None):
+    logging.info("Loading Background gene set...")
     if reference_list: 
         reference_list_wona = [item for item in reference_list if str(item) != 'nan']
         GeneID2nt_mus = dict(filter(lambda item: item[0] in reference_list_wona, GeneID2nt_mus.items()))
-        print('Number of items in reference list provided:', len(reference_list_wona))
-
-    print('Number of items in reference list: ', len(GeneID2nt_mus))
+        logging.info('Number of items in background gene set (experiment specific set): %s', len(reference_list_wona))
+    else:
+        logging.info('Number of items in background gene set (NCBI all mouse protein coding genes): %s', len(GeneID2nt_mus))
 
     # create go object this needs to be done only once if whole mouse genome is used
     # if individual reference list are used then it needs to be done for every file
-
+    logging.info("Initializing GOEA object which holds the Ontologies, Associations, and background...")
     goeaobj = GOEnrichmentStudyNS(GeneID2nt_mus, # List of mouse protein-coding genes
                                   ns2assoc, # geneid/GO associations
                                   obodag, # Ontologies
                                   propagate_counts = False,
                                   alpha = 0.05, # default significance cut-off
                                   methods = ['fdr_bh']) # defult multipletest correction method
-    
+                         
     return goeaobj
 
 def get_all_goterms(goeaobj):
@@ -121,7 +124,7 @@ def get_all_goterms(goeaobj):
     return GO_items
 
 def go_it(test_genes, goeaobj, GO_items, inv_map):
-    print(f'Numper of input GeneIDs: {len(test_genes)}')
+    logging.info(f'Number of input GeneIDs for GO analysis: {len(test_genes)}')
     
     goea_results_all = goeaobj.run_study(test_genes)
     goea_results_sig = [r for r in goea_results_all if r.p_fdr_bh < 0.05]
@@ -185,7 +188,7 @@ def create_go_plots(df):
                              size = 'n_genes',
                              sizes=(10, 100),
                              hue = "n_genes",
-                             hue_norm=(0, 50),
+                             hue_norm=(sub_df.n_genes.min(), sub_df.n_genes.max()),
                              #palette = mapper.to_rgba(sub_df["-log10(FDR)"].values),
                              ax=axs[count],
                              zorder=1)
@@ -204,8 +207,6 @@ def create_go_plots(df):
 
 
 def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_path, reference):
-    #change filter not volcano_df 
-
     reg_cols = pass_cutoff_true_df.filter(regex="Regulation_").columns.tolist()
     cols_to_select = ["gene_id"] + reg_cols
     subset_df = pass_cutoff_true_df[cols_to_select]
@@ -214,7 +215,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
     unique_col_list = list(set(cols_list))
 
     for comparison in unique_col_list: 
-        print(comparison)
+        logging.info(comparison)
         comparison_df = subset_df.filter(like=comparison)
         reg_col = [col for col in comparison_df if col.startswith('Regulation_')]
 
@@ -222,7 +223,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         sign_up = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Up"]
         up_gene_ids_list = sign_up.reset_index().gene_id.tolist()
         up_gene_ids_list_wona = [item for item in up_gene_ids_list if str(item) != 'nan']
-        print("nas in UP:", len(up_gene_ids_list) - len(up_gene_ids_list_wona))
+        logging.info("nas in UP reg list: %s", len(up_gene_ids_list) - len(up_gene_ids_list_wona))
 
         df = go_it(up_gene_ids_list_wona, goeaobj, GO_items, inv_map)
         fig = create_go_plots(df)
@@ -233,7 +234,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         sign_down = comparison_df.loc[comparison_df[reg_col[0]] == "Significant Down"]
         down_gene_ids_list = sign_down.reset_index().gene_id.tolist()
         down_gene_ids_list_wona = [item for item in down_gene_ids_list if str(item) != 'nan']
-        print("nas in DOWN:", len(down_gene_ids_list) - len(down_gene_ids_list_wona))
+        logging.info("nas in DOWN reg list: %s", len(down_gene_ids_list) - len(down_gene_ids_list_wona))
 
         df = go_it(down_gene_ids_list_wona, goeaobj, GO_items, inv_map)
         fig = create_go_plots(df)
@@ -244,7 +245,7 @@ def get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, folder_p
         sign_up_down = comparison_df.loc[comparison_df[reg_col[0]].isin(["Significant Up", "Significant Down"])]
         up_down_gene_ids_list = sign_up_down.reset_index().gene_id.tolist()
         up_down_gene_ids_list_wona = [item for item in up_down_gene_ids_list if str(item) != 'nan']
-        print("nas in UP:", len(up_down_gene_ids_list) - len(up_down_gene_ids_list_wona))
+        logging.info("nas in UP and DOWN reg list: %s", len(up_down_gene_ids_list) - len(up_down_gene_ids_list_wona))
 
         df = go_it(up_down_gene_ids_list_wona, goeaobj, GO_items, inv_map)
         fig = create_go_plots(df)
