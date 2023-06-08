@@ -21,7 +21,7 @@ with open('paths.json') as paths_file:
 
 paths_json = json.loads(file_contents)
 paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
-with_signalp = True
+with_signalp = False
 
 # %%
 # read in all paths 
