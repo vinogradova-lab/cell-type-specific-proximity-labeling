@@ -422,5 +422,5 @@ for file_name in list_of_file_names:
             GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
             get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
 
-
-# %%
+logging.info('\n')
+logging.info("Program finished")
