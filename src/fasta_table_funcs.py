@@ -215,3 +215,13 @@ def add_db_key(df, uniprot_mapping_dict, gene_name_mapping_dict):
         return uniprot_mapping_dict[uniprot_id]
     elif gene_name in gene_name_mapping_dict: 
         return gene_name_mapping_dict[gene_name]
+
+def clean_human_uniprot(str_of_uniprots):
+    uniprot_list = str(str_of_uniprots).split(",")
+    clean_list = []
+    for uniprot in uniprot_list: 
+        if uniprot != 'nan':
+            if uniprot not in clean_list:
+                clean_list.append(uniprot)
+
+    return(", ".join(clean_list))

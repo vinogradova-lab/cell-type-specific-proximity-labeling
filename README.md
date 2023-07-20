@@ -26,7 +26,9 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
     - obtain human-mouse gene orthologs by following tutorial: [How to get all the orthologous genes between two species](https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/) 
     - this allows us to get the correct mouse gene names which correspond to the mitomatrix protein list, we then crossreference our fasta table and label them as FP
   - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation, also if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
+  - crossreference table with secretion prediction resource shared by Corey 
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
+  - crossreference table with Crapome database
   - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
   - save table
   - Number of TP proteins: 2806
@@ -43,7 +45,9 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
     - this allows us to get the correct mouse gene names which correspond to the mitomatrix protein list, we then crossreference our fasta table and label them as FP
   - add table shared by Corey "secretion prediction resource" to main table and check if if sp_score > 0.7 and ups_score == 0 is True otherwise exclude the proteins from TP list
   - if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
+  - crossreference table with secretion prediction resource shared by Corey 
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
+  - crossreference table with Crapome database
   - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
   - save table
   - Number of TP proteins: 1602

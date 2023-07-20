@@ -21,7 +21,7 @@ with open('paths.json') as paths_file:
 
 paths_json = json.loads(file_contents)
 paths_dict = paths_json["mouse_fasta_to_FP_TP_tables_paths"]
-with_signalp = False
+with_signalp = True
 
 # %%
 # read in all paths 
@@ -33,6 +33,7 @@ mart_export_path = Path(paths_dict['mart_export_path'])
 output_folder_path = Path(paths_dict['output_folder_path']) 
 secretion_prediction_resource_path = Path(paths_dict['secretion_prediction_resource_path'])
 human_mouse_homology_mapping_path = Path(paths_dict['human_mouse_homology_mapping_path'])
+human_crapome_mapping_path = Path(paths_dict['human_crapome_mapping_path'])
 gprofiler_mouse_geneid_mapping_path = Path(paths_dict['gprofiler_mouse_geneid_mapping_path'])
 leftover_uniprot_geneid_mapping_path = Path(paths_dict['leftover_uniprot_geneid_mapping_path'])
 
@@ -121,11 +122,39 @@ gene_name_mapping_dict, uniprot_mapping_dict, human_mouse_homology_mapping_rearr
 merged_main_fasta_table  = merged_main_fasta_table.reset_index()
 merged_main_fasta_table["DB Class Key_jackson_homology_db"] = merged_main_fasta_table.apply(add_db_key, args=(uniprot_mapping_dict, gene_name_mapping_dict), axis=1)
 merged_main_fasta_table = merged_main_fasta_table.merge(human_mouse_homology_mapping_rearranged_df, on="DB Class Key_jackson_homology_db", how="left")
+
+# clean up duplicates 
+merged_main_fasta_table["SWISS_PROT IDs_human_jackson_homology_db"] = merged_main_fasta_table["SWISS_PROT IDs_human_jackson_homology_db"].apply(clean_human_uniprot)
+
 assert initial_number_of_entires == len(merged_main_fasta_table)
 print("Human uniprot ids from jacksons db added!")
 
 # %% 
-assert merged_main_fasta_table["DB Class Key_jackson_homology_db"].count() == 19272
+# add crapome data 
+col_list = merged_main_fasta_table["SWISS_PROT IDs_human_jackson_homology_db"].tolist()
+def check_if_uniprot_in_merged_column_and_add_key(uniprot):
+    for item in col_list: 
+        if uniprot in item: 
+            return(item)
+
+human_crapome_mapping_df = pd.read_csv(human_crapome_mapping_path, sep="\t")
+human_crapome_mapping_df["found"] = human_crapome_mapping_df["Num of Expt. (found/total)"].str.split(" / ").str[0]
+human_crapome_mapping_df["contaminant"] = human_crapome_mapping_df["found"].replace('', 0).astype(float) > 200
+human_crapome_mapping_df = human_crapome_mapping_df[human_crapome_mapping_df["Mapped Gene Symbol"].str.contains("Invalid identifier") == False]
+human_crapome_mapping_df["Key"] = human_crapome_mapping_df["User Input"].apply(check_if_uniprot_in_merged_column_and_add_key)
+if human_crapome_mapping_df.loc[2881, 'User Input'] == 'P0DP25':
+    human_crapome_mapping_df.loc[2881, 'Key'] = 'P0DP25'
+
+human_crapome_mapping_df.to_csv(output_folder_path / "03_crapome_mapping" / "crapome_key_for_merged_fasta_table.csv")
+
+# %% 
+contaminants = human_crapome_mapping_df[human_crapome_mapping_df["contaminant"] == True]
+contaminants = contaminants[["contaminant", "Key"]].drop_duplicates()
+contaminants = contaminants.rename(columns={"Key":"SWISS_PROT IDs_human_jackson_homology_db"})
+merged_main_fasta_table = merged_main_fasta_table.merge(contaminants, on="SWISS_PROT IDs_human_jackson_homology_db", how="left")
+
+# %% 
+assert merged_main_fasta_table["DB Class Key_jackson_homology_db"].count() == 19272 #or 19273
 
 # %% 
 # add additional gene id mapping 
@@ -146,4 +175,19 @@ else:
     merged_main_fasta_table.to_csv(output_folder_path / "03_table_for_analysis" / "main_fasta_table_without_signal_p.csv")
 
 print("File saved, with signalp = ", with_signalp)
+# %%
+#new_list = []
+#human_uniprot_list = merged_main_fasta_table["SWISS_PROT IDs_human_jackson_homology_db"].tolist()
+#for item in human_uniprot_list: 
+#    if len(item) > 1: 
+#        item_list = item.split(', ')
+#        for subitem in item_list: 
+#            new_list.append(subitem)
+#    elif len(item) > 0 and len(item) < 2:     
+#        new_list.append(item)
+
+# %%
+#clean_new_list = list(set(new_list))
+#for item in clean_new_list: 
+#    print(item)
 # %%
