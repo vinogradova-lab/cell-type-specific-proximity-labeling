@@ -81,6 +81,9 @@ assert len(file_channel_dict) == len(list_of_file_names) == len(file_condition_d
 keratins = fasta_table[fasta_table.keratin == True]
 keratins_list = keratins.index.tolist()
 
+contaminants = fasta_table[fasta_table.contaminant == True]
+contaminants_list = contaminants.index.tolist()
+
 folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
 if not os.path.exists(folder_path):
     os.mkdir(folder_path)
@@ -100,6 +103,12 @@ for file in list_of_file_paths:
     after_keratin_removal = len(df)
     logging.info("Removed %s keratins", before_keratin_removal-after_keratin_removal)
 
+    # remove contaminants 
+    before_contaminant_removal = len(df)
+    df = df[~df.uniprot.isin(contaminants_list)]
+    after_contaminant_removal = len(df)
+    logging.info("Removed %s contaminants", before_contaminant_removal-after_contaminant_removal)
+
     # rename columns
     df = df.set_index(["uniprot", 'description', 'pep_num'])
     df.rename(columns=file_channel_dict[file_name], inplace=True)
@@ -111,7 +120,7 @@ for file in list_of_file_paths:
     #merged = merged.drop_duplicates()
     #merged = merged.rename(columns={"Entry": "uniprot_id"})
 
-    assert after_keratin_removal == len(merged)
+    assert after_contaminant_removal == len(merged)
 
     merged_df = merged.set_index(["uniprot_id", "description", "pep_num", "annotation"])
     dfs_dict[file_name] = merged_df
