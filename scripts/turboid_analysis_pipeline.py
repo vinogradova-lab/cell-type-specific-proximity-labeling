@@ -213,6 +213,10 @@ for file_name in list_of_file_names:
     conditions_list = file_condition_dict[file_name]["conditions"]
     control_labelling = file_condition_dict[file_name]["control_labelling"]
     treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
+
+    empty_cols = df.filter(like="Empty").columns.tolist()
+    if len(empty_cols) > 0:
+        df = df.drop(empty_cols, axis=1)
     
     # RAW
     pca_fig_1 = get_pca_plot(df, "Raw")
@@ -228,10 +232,6 @@ for file_name in list_of_file_names:
                 xlabel="Channels", 
                 ylabel="log2(SI)", 
                 color = "green")
-
-    empty_cols = df.filter(like="Empty").columns.tolist()
-    if len(empty_cols) > 0:
-        df = df.drop(empty_cols, axis=1)
 
     norm_df = normalization_allcre_channels(df, treatment_labelling) 
     assert len(norm_df) == len(df)
