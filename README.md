@@ -3,6 +3,13 @@
 
 ### **Step 1 (processing of raw census-out files)**
 
+- Open Windows remote 
+- Open powershell as administrator 
+- type: cd /Users/Public
+- .\start_pipeline.ps1 process_file_folder
+- enter input folder path: copy path to where the census file folder is 
+- enter output folder path: copy path to where you want to save everything
+
 Files were processed with the Vinogradova Lab pipeline and were treated as “whole proteome” files – i.e., we quantify protein expression changes and corresponding peptide values were summed to receive the respective raw signal intensity per protein
 
 --> Processing details
