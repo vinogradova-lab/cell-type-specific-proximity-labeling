@@ -2,8 +2,8 @@ FROM continuumio/miniconda3
 
 WORKDIR /work_dir
 
-COPY environment.yml .
-RUN conda env create -f myenv.yml
+COPY environment_slim.yml .
+RUN conda env create -f environment_slim.yml
 
 SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
 

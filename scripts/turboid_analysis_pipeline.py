@@ -23,8 +23,6 @@ import warnings
 import kaleido
 import itertools
 warnings.filterwarnings('ignore')
-%load_ext autoreload
-%autoreload 2
 
 # %% 
 # read in paths from json

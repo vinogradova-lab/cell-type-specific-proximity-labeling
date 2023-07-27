@@ -1,5 +1,39 @@
 from csv import reader
 import json
+import questionary 
+import pathlib 
+
+def get_input_output_folder(workdir_path, folder_name):
+
+    """ This function identifies if the program was started with provided input and output folders
+        i.e this is helpful if program is started without docker - then it will ask for folder paths
+        otherwise if it is started in docker we usually provide input and output folder path through the -v parameter.
+        In another scenario if you have input and output folder already in the workdir_path prgram will also not ask for folders
+        but will ask for confirmation if you are sure that you want to continue and use these.
+
+        Input: workdir_path (as pathlib object/ or not it will get converted to one anyway) and folder name
+        Output: folder_path
+    """
+
+    workdir_path_obj = pathlib.Path(workdir_path)
+    folder_path = workdir_path_obj / folder_name
+    query = folder_path.exists() #it exists if started with docker, it does not exists if started without
+
+    if query == True:
+        answer = (
+            questionary.select(
+                "An {} was provided or already exists in your working directory, if either is true confirm with yes to continue:".format(folder_name),
+                choices=['yes','no'],
+            ).ask()
+        )
+        if answer == "yes":
+            folder_path = folder_path
+        else:
+            print("Remove the folder called {} from your working directory or please change the name and try again!".format(folder_name))
+            exit()
+    else:
+        folder_path = (questionary.path("Select folder (hit / and direct to your folder, full path required)").ask())
+    return folder_path 
 
 
 def get_channel_name_dict(input_folder_path, list_of_file_names):
