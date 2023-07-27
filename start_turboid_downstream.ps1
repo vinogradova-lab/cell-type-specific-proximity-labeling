@@ -9,7 +9,7 @@ if ($1 -eq "process_data") {
     Write-Host ""
     $OUTPUTFOLDER = Read-Host "Enter your output folder path"
     Write-Host ""
-    $FASTATABLE = Read-Host "Enter your fasta table file path (file name: main_fasta_table_without_signal_p.csv):"
+    $FASTATABLE = Read-Host "Enter your fasta table file path (file name: main_fasta_table_without_signal_p.csv)"
     Write-Host ""
     docker run --platform linux/amd64 -m 6g -t -i -v ${INPUTFOLDER}:/work_dir/input_folder -v ${OUTPUTFOLDER}:/work_dir/output_folder -v ${FASTATABLE}:/work_dir/fasta_table_tp_fp_list turboid_downstream $1
 }
