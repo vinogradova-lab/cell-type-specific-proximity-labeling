@@ -1,4 +1,3 @@
-# %%
 import os
 import pandas as pd
 import numpy as np
@@ -11,12 +10,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.express as px
 import json
-from src.cutoff_funcs import *
-from src.filter_funcs import *
-from src.norm_funcs import *
-from src.readin_funcs import *
-from src.go_funcs import * 
-from src.figure_parameters import * 
+from cutoff_funcs import *
+from filter_funcs import *
+from norm_funcs import *
+from readin_funcs import *
+from go_funcs import * 
+from figure_parameters import * 
 import logging
 import subprocess 
 import warnings 
@@ -24,391 +23,301 @@ import kaleido
 import itertools
 warnings.filterwarnings('ignore')
 
-# %% 
-# read in paths from json
-with open('paths.json') as paths_file:
-    file_contents = paths_file.read()
 
-paths_json = json.loads(file_contents)
-paths_dict = paths_json["turbo_id_analysis_pipeline_paths"]
+def read_in_fasta_table(fasta_table_path): 
+    # read in fasta table containing TP and FP annotation
+    fasta_table = pd.read_csv(fasta_table_path, index_col=[1])
+    TP_list = fasta_table[fasta_table["annotation"] == "TP"]
+    FP_list = fasta_table[fasta_table["annotation"] == "FP"]
 
-# %%
-# paths % configs 
-commit_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip() 
-input_folder_path = Path(paths_dict['input_folder_path'])
-output_folder_path = Path(paths_dict['output_folder_path'])
-fasta_table_path = Path(paths_dict['fasta_table_path'])
-logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', 
-                    filemode='w', 
-                    encoding='utf-8', 
-                    level=logging.INFO, 
-                    format='%(asctime)s %(message)s', 
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
-logging.info('Program starting')
-logging.info('Gitcommit sha: %s', commit_sha)
+    logging.info("Annotation table used (contains TP and FP lists): %s", fasta_table_path.stem)
+    logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
+    logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
 
-# %%
-# read in fasta table containing TP and FP annotation 
-fasta_table = pd.read_csv(fasta_table_path, index_col=[1])
-TP_list = fasta_table[fasta_table["annotation"] == "TP"]
-FP_list = fasta_table[fasta_table["annotation"] == "FP"]
+    assert len(TP_list) == 2806
+    assert len(FP_list) == 435
+    return fasta_table
 
-logging.info("Annotation table used (contains TP and FP lists): %s", fasta_table_path.stem)
-logging.info("Number of Uniport IDs in TP list: %s", len(TP_list))
-logging.info("Number of Uniport IDs in FP list: %s", len(FP_list))
+def get_list_of_files(input_folder_path):
+    # Get list of files, file_channel_dict and cond_dict of processed census-out files
+    list_of_file_paths = list(input_folder_path.iterdir())
+    list_of_file_paths = [x for x in list_of_file_paths if 'census-out' in x.stem]
 
-assert len(TP_list) == 2806
-assert len(FP_list) == 435
+    list_of_file_names = [file_path.stem for file_path in list_of_file_paths]
+    file_channel_dict = get_channel_name_dict(input_folder_path, list_of_file_names)
+    file_condition_dict = get_cond_info(input_folder_path, list_of_file_names)
 
-# %%
-# Get list of files, file_channel_dict and cond_dict of processed census-out files
-list_of_file_paths = list(input_folder_path.iterdir())
-list_of_file_paths = [x for x in list_of_file_paths if 'census-out' in x.stem]
+    logging.info("Number of files: %s", len(list_of_file_names))
+    logging.info("List of Files: %s", list_of_file_names)
 
-list_of_file_names = [file_path.stem for file_path in list_of_file_paths]
-file_channel_dict = get_channel_name_dict(input_folder_path, list_of_file_names)
-file_condition_dict = get_cond_info(input_folder_path, list_of_file_names)
+    assert len(file_channel_dict) == len(list_of_file_names) == len(file_condition_dict)
+    return list_of_file_paths, file_channel_dict, list_of_file_names, file_condition_dict
 
-logging.info("Number of files: %s", len(list_of_file_names))
-logging.info("List of Files: %s", list_of_file_names)
-
-assert len(file_channel_dict) == len(list_of_file_names) == len(file_condition_dict)
-
-# %%
+def assign_column_names_clean_keratins_and_contaminants(fasta_table, output_folder_path, list_of_file_paths, file_channel_dict):
 # Assign new column names accoriding to metadata_col.csv and remove keratins in each file and annotate TP and FP
-keratins = fasta_table[fasta_table.keratin == True]
-keratins_list = keratins.index.tolist()
+    keratins = fasta_table[fasta_table.keratin == True]
+    keratins_list = keratins.index.tolist()
 
-contaminants = fasta_table[fasta_table.contaminant == True]
-contaminants_list = contaminants.index.tolist()
+    contaminants = fasta_table[fasta_table.contaminant == True]
+    contaminants_list = contaminants.index.tolist()
 
-folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
-if not os.path.exists(folder_path):
-    os.mkdir(folder_path)
+    folder_path = output_folder_path / "01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
 
-logging.info('\n')
-logging.info("Assiging new column names according to metadata_col.csv, removing keratins in each file and annotating TP and FP proteins")
-
-dfs_dict = {}
-for file in list_of_file_paths:
-    file_name = file.stem
-    logging.info("Processing: %s", file_name)
-    df = pd.read_csv(file)
-    
-    # remove keratins 
-    before_keratin_removal = len(df)
-    df = df[~df.uniprot.isin(keratins_list)]
-    after_keratin_removal = len(df)
-    logging.info("Removed %s keratins", before_keratin_removal-after_keratin_removal)
-
-    # remove contaminants 
-    before_contaminant_removal = len(df)
-    df = df[~df.uniprot.isin(contaminants_list)]
-    after_contaminant_removal = len(df)
-    logging.info("Removed %s contaminants", before_contaminant_removal-after_contaminant_removal)
-
-    # rename columns
-    df = df.set_index(["uniprot", 'description', 'pep_num'])
-    df.rename(columns=file_channel_dict[file_name], inplace=True)
-    
-    # annotate TP FP
-    df = df.reset_index()
-    df = df.rename(columns={"uniprot": "uniprot_id"})
-    merged = df.merge(fasta_table[["annotation"]].reset_index(), on="uniprot_id", how="left")
-    #merged = merged.drop_duplicates()
-    #merged = merged.rename(columns={"Entry": "uniprot_id"})
-
-    assert after_contaminant_removal == len(merged)
-
-    merged_df = merged.set_index(["uniprot_id", "description", "pep_num", "annotation"])
-    dfs_dict[file_name] = merged_df
-    merged_df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
-
-logging.info("FOLDER COMPLETE: 01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated")
-
-# %%
-# Filter based on condition 
-folder_path = output_folder_path / "02_filtering_per_cond_per_file" 
-if not os.path.exists(folder_path):
-    os.mkdir(folder_path)
-
-logging.info('\n')
-logging.info("Filtering based on cre+ channels per condition per file")
-
-filtered_dict = {}
-for file_name in list_of_file_names:
-    file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
-    if not os.path.exists(file_folder_path):
-        os.mkdir(file_folder_path)
-
-    logging.info("Processing: %s", file_name.split("processed_census-out_")[1])
-    
-    df = dfs_dict[file_name]
-    before_filtering = len(df)
-    conditions_list = file_condition_dict[file_name]["conditions"]
-    control_labelling = file_condition_dict[file_name]["control_labelling"]
-    treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
-
-    #filter each condition in file 
-    filtered_sub_dfs = []
-    for condition in conditions_list:
-        sub_df = get_condition_df(df, condition)
-        filtered_sub_df, cond_columns, ctrl_columns = filter_condition_df(sub_df, treatment_labelling, control_labelling)
-        filtered_sub_df = filtered_sub_df.reset_index()
-        filtered_sub_dfs.append(filtered_sub_df)
-    
-    merge_on_cols = ['uniprot_id','description', 'pep_num', "annotation"]
-    filtered_final_table = reduce(lambda df1,df2: pd.merge(df1,df2,on=merge_on_cols, how="outer"), filtered_sub_dfs)
-
-    raw_df = df.reset_index()
-    uniprot_ids = filtered_final_table["uniprot_id"].tolist()
-
-    sub_raw_df = raw_df[raw_df['uniprot_id'].isin(uniprot_ids)]
-    sub_raw_df = sub_raw_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
-
-    logging.info("Proteins were filtered out, because they did not pass at least one condition: %s", before_filtering-len(sub_raw_df))
-    logging.info("Filtering for %s done", file_name)
-
-    filtered_dict[file_name] = sub_raw_df
-    sub_raw_df.to_csv(file_folder_path / ("passed_filter_" + file_name + ".csv"))
-
-    # save filtered out proteins
-    filtered_out_df = raw_df[~raw_df['uniprot_id'].isin(uniprot_ids)]
-    filtered_out_df = filtered_out_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
-    filtered_out_df.to_csv(file_folder_path / ("removed_" + file_name + ".csv"))
-
-logging.info("FOLDER COMPLETE: 02_filtering_per_cond_per_file")
-
-# %%
-# (1) generate the output put with raw SI and annotation TP/FP; 
-# (2) look at TP proteins with 2+ peptides; 
-# (3) calculate median SI for each cre+ channel and median of sums; 
-# (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and 
-# (5) use those normalization values for each channel;
-# (6) to this for all channels or for only cre+ channels
-folder_path = output_folder_path / "03_normalisation_plots"
-if not os.path.exists(folder_path):
-    os.mkdir(folder_path)
-
-logging.info('\n')
-logging.info("Creating normalized data tables and normalization plots")
-
-normalized_dict = {}
-for file_name in list_of_file_names:
-    file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
-    if not os.path.exists(file_folder_path):
-        os.mkdir(file_folder_path)
-
-    logging.info("Processing %s", file_name)
-    
-    plot_list = []
-    fig = plt.figure(figsize=(25, 13)) 
-    fig.suptitle(file_name)
-    ax1 = plt.subplot(121) 
-    ax2 = plt.subplot(122) 
-    
-    df = filtered_dict[file_name]
-    conditions_list = file_condition_dict[file_name]["conditions"]
-    control_labelling = file_condition_dict[file_name]["control_labelling"]
-    treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
-
-    empty_cols = df.filter(like="Empty").columns.tolist()
-    if len(empty_cols) > 0:
-        df = df.drop(empty_cols, axis=1)
-    
-    # RAW
-    pca_fig_1 = get_pca_plot(df, "Raw")
-    pca_fig_1.write_image(file_folder_path / "pca_raw_data.svg", engine="kaleido")
-    plot_list.append(pca_fig_1)
-    
-    df_log = np.log2(df)
-    df_log.plot(kind='box', 
-                rot=90, 
-                fontsize=10, 
-                title="Raw", 
-                ax=ax1, 
-                xlabel="Channels", 
-                ylabel="log2(SI)", 
-                color = "green")
-
-    norm_df = normalization_allcre_channels(df, treatment_labelling) 
-    assert len(norm_df) == len(df)
-    assert norm_df.columns.tolist() == df.columns.tolist()
-
-    pca_fig_2 = get_pca_plot(norm_df, "Normalized")
-    pca_fig_2.write_image(file_folder_path / "pca_norm_data.svg", engine="kaleido")
-    plot_list.append(pca_fig_2)
-    
-    norm_df_log = np.log2(norm_df)
-    norm_df_log.plot(kind='box', 
-                     rot=90, 
-                     fontsize=10, 
-                     title="Normalized", 
-                     ax=ax2, 
-                     xlabel="Channels", 
-                     ylabel="log2(SI)", 
-                     color = "darkblue")
-    
-    # this is what gets passed into cutoff analysis
-    normalized_dict[file_name] = norm_df
-    
-    fig.savefig(file_folder_path / ("box_plots_" + file_name + '.png'))
-    with open(file_folder_path / ("pca_plots_" + file_name + '.html'), 'w') as f:
-        f.write(file_name)
-        for fig in plot_list:
-            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
-
-logging.info("FOLDER COMPLETE: 03_normalisation_plots")
-
-# %%
-# save normalized df in folder
-logging.info('\n')
-logging.info("Saving normalized tables")
-
-folder_path = output_folder_path / "04_normalized"
-if not os.path.exists(folder_path):
-    os.mkdir(folder_path)
-
-for file_name in list_of_file_names:
-    df = normalized_dict[file_name]
-    df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
-
-logging.info("FOLDER COMPLETE: 04_normalized")
-
-# %% 
-# Initialization for go term analysis 
-logging.info('\n')
-logging.info("Starting initialization for go term analysis")
-GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
-obodag, ns2assoc = initialize_godag_obj(file_gene2go)
-goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
-GO_items = get_all_goterms(goeaobj)
-
- # %% 
-# split tissue and serum 
-logging.info('\n')
-logging.info("Starting individual analysis for tissue and serum files...")
-
-folder_path = output_folder_path / "05_results"
-if not os.path.exists(folder_path):
-    os.mkdir(folder_path)
-
-tissue_folder_path = folder_path / "01_tissue"
-if not os.path.exists(tissue_folder_path):
-    os.mkdir(tissue_folder_path)
-
-serum_folder_path = folder_path / "02_serum"
-if not os.path.exists(serum_folder_path):
-    os.mkdir(serum_folder_path)
-
-for file_name in list_of_file_names:
-    # get data
-    df = normalized_dict[file_name]
-    conditions_list = file_condition_dict[file_name]["conditions"]
-    control_labelling = file_condition_dict[file_name]["control_labelling"]
-    treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
-    file_type = file_condition_dict[file_name]["file_type"]
-    cutoff_dict = {}
-    
     logging.info('\n')
-    logging.info("Processing file: %s", file_name)
-    
-    if file_type == "serum": 
-        serum_file_folder_path = serum_folder_path / file_name.split("processed_census-out_")[1]
-        if not os.path.exists(serum_file_folder_path):
-            os.mkdir(serum_file_folder_path)
+    logging.info("Assiging new column names according to metadata_col.csv, removing keratins in each file and annotating TP and FP proteins")
 
-        volcano_folder_path = serum_file_folder_path / 'volcano_plot'
-        if not os.path.exists(volcano_folder_path):
-            os.mkdir(volcano_folder_path)
-
-        volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, volcano_folder_path)
+    dfs_dict = {}
+    for file in list_of_file_paths:
+        file_name = file.stem
+        logging.info("Processing: %s", file_name)
+        df = pd.read_csv(file)
         
-        heatmap_folder_path = serum_file_folder_path / 'heatmap_plot'
-        if not os.path.exists(heatmap_folder_path):
-            os.mkdir(heatmap_folder_path)
+        # remove keratins 
+        before_keratin_removal = len(df)
+        df = df[~df.uniprot.isin(keratins_list)]
+        after_keratin_removal = len(df)
+        logging.info("Removed %s keratins", before_keratin_removal-after_keratin_removal)
+
+        # remove contaminants 
+        before_contaminant_removal = len(df)
+        df = df[~df.uniprot.isin(contaminants_list)]
+        after_contaminant_removal = len(df)
+        logging.info("Removed %s contaminants", before_contaminant_removal-after_contaminant_removal)
+
+        # rename columns
+        df = df.set_index(["uniprot", 'description', 'pep_num'])
+        df.rename(columns=file_channel_dict[file_name], inplace=True)
         
-        get_heatmap(df, treatment_labelling, volcano_df, file_name, heatmap_folder_path)
-        df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
-        annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
-        annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
+        # annotate TP FP
+        df = df.reset_index()
+        df = df.rename(columns={"uniprot": "uniprot_id"})
+        merged = df.merge(fasta_table[["annotation"]].reset_index(), on="uniprot_id", how="left")
+        #merged = merged.drop_duplicates()
+        #merged = merged.rename(columns={"Entry": "uniprot_id"})
+
+        assert after_contaminant_removal == len(merged)
+
+        merged_df = merged.set_index(["uniprot_id", "description", "pep_num", "annotation"])
+        dfs_dict[file_name] = merged_df
+        merged_df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
+
+    logging.info("FOLDER COMPLETE: 01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated")
+    return dfs_dict
+
+def filter_based_on_cond(output_folder_path, list_of_file_names, dfs_dict, file_condition_dict):
+    # Filter based on condition 
+    folder_path = output_folder_path / "02_filtering_per_cond_per_file" 
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    logging.info('\n')
+    logging.info("Filtering based on cre+ channels per condition per file")
+
+    filtered_dict = {}
+    for file_name in list_of_file_names:
+        file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
+        if not os.path.exists(file_folder_path):
+            os.mkdir(file_folder_path)
+
+        logging.info("Processing: %s", file_name.split("processed_census-out_")[1])
         
-        goterm_analysis_folder_path = serum_file_folder_path / 'goterm_analysis'
-        if not os.path.exists(goterm_analysis_folder_path):
-            os.mkdir(goterm_analysis_folder_path)
+        df = dfs_dict[file_name]
+        before_filtering = len(df)
+        conditions_list = file_condition_dict[file_name]["conditions"]
+        control_labelling = file_condition_dict[file_name]["control_labelling"]
+        treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
 
-        full_mouse_genome_folder_path = goterm_analysis_folder_path / 'full_mouse_genome_background'
-        if not os.path.exists(full_mouse_genome_folder_path):
-            os.mkdir(full_mouse_genome_folder_path)
-
-        get_up_down_goterm(annotated_protein_df, goeaobj, GO_items, inv_map, full_mouse_genome_folder_path, 'full_mouse_genome')
+        #filter each condition in file 
+        filtered_sub_dfs = []
+        for condition in conditions_list:
+            sub_df = get_condition_df(df, condition)
+            filtered_sub_df, cond_columns, ctrl_columns = filter_condition_df(sub_df, treatment_labelling, control_labelling)
+            filtered_sub_df = filtered_sub_df.reset_index()
+            filtered_sub_dfs.append(filtered_sub_df)
         
-        exp_ref_folder_path = goterm_analysis_folder_path / 'experiment_specific_background'
-        if not os.path.exists(exp_ref_folder_path):
-            os.mkdir(exp_ref_folder_path)
+        merge_on_cols = ['uniprot_id','description', 'pep_num', "annotation"]
+        filtered_final_table = reduce(lambda df1,df2: pd.merge(df1,df2,on=merge_on_cols, how="outer"), filtered_sub_dfs)
 
-        # goterms with reference list 
-        ref_df = normalized_dict[file_name]
-        gene_id_list = ref_df.reset_index().set_index("uniprot_id").join(fasta_table["gene_id"]).gene_id.tolist()
-        goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
-        GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
-        get_up_down_goterm(annotated_protein_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
+        raw_df = df.reset_index()
+        uniprot_ids = filtered_final_table["uniprot_id"].tolist()
 
-    elif file_type == "tissue":
-        tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
-        if not os.path.exists(tissue_file_folder_path):
-           os.mkdir(tissue_file_folder_path)
+        sub_raw_df = raw_df[raw_df['uniprot_id'].isin(uniprot_ids)]
+        sub_raw_df = sub_raw_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
 
-        cutoff_roc_path = tissue_file_folder_path / "01_cutoff_ROC_filter"
-        if not os.path.exists(cutoff_roc_path):
-            os.mkdir(cutoff_roc_path)
-        decision_table, cutoff_plots_table = get_ratios_and_cutoffs(df, conditions_list, control_labelling, treatment_labelling, cutoff_roc_path, cutoff_dict, file_name, fasta_table)
-        get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutoff_dict)
+        logging.info("Proteins were filtered out, because they did not pass at least one condition: %s", before_filtering-len(sub_raw_df))
+        logging.info("Filtering for %s done", file_name)
 
-        pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
+        filtered_dict[file_name] = sub_raw_df
+        sub_raw_df.to_csv(file_folder_path / ("passed_filter_" + file_name + ".csv"))
+
+        # save filtered out proteins
+        filtered_out_df = raw_df[~raw_df['uniprot_id'].isin(uniprot_ids)]
+        filtered_out_df = filtered_out_df.set_index(["uniprot_id", 'description', 'pep_num', 'annotation'])
+        filtered_out_df.to_csv(file_folder_path / ("removed_" + file_name + ".csv"))
+
+    logging.info("FOLDER COMPLETE: 02_filtering_per_cond_per_file")
+    return filtered_dict
+
+def normalization_plots(output_folder_path, list_of_file_names, filtered_dict, file_condition_dict): 
+    # (1) generate the output put with raw SI and annotation TP/FP; 
+    # (2) look at TP proteins with 2+ peptides; 
+    # (3) calculate median SI for each cre+ channel and median of sums; 
+    # (4) calculate normalization ratios by dividing (median of median)/(median cre+ channel), and 
+    # (5) use those normalization values for each channel;
+    # (6) to this for all channels or for only cre+ channels
+    folder_path = output_folder_path / "03_normalisation_plots"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    logging.info('\n')
+    logging.info("Creating normalized data tables and normalization plots")
+
+    normalized_dict = {}
+    for file_name in list_of_file_names:
+        file_folder_path = folder_path / file_name.split("processed_census-out_")[1]
+        if not os.path.exists(file_folder_path):
+            os.mkdir(file_folder_path)
+
+        logging.info("Processing %s", file_name)
         
-        pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
-        pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
+        plot_list = []
+        fig = plt.figure(figsize=(25, 13)) 
+        fig.suptitle(file_name)
+        ax1 = plt.subplot(121) 
+        ax2 = plt.subplot(122) 
+        
+        df = filtered_dict[file_name]
+        conditions_list = file_condition_dict[file_name]["conditions"]
+        control_labelling = file_condition_dict[file_name]["control_labelling"]
+        treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
 
-        if file_name == "processed_census-out_04172023_CRW_A-5_16pl_M":
-            volcano_df = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
-            pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
-            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("BAT_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
+        empty_cols = df.filter(like="Empty").columns.tolist()
+        if len(empty_cols) > 0:
+            df = df.drop(empty_cols, axis=1)
+        
+        # RAW
+        pca_fig_1 = get_pca_plot(df, "Raw")
+        pca_fig_1.write_image(file_folder_path / "pca_raw_data.svg", engine="kaleido")
+        plot_list.append(pca_fig_1)
+        
+        df_log = np.log2(df)
+        df_log.plot(kind='box', 
+                    rot=90, 
+                    fontsize=10, 
+                    title="Raw", 
+                    ax=ax1, 
+                    xlabel="Channels", 
+                    ylabel="log2(SI)", 
+                    color = "green")
 
-            pass_cutoff_true_df = decision_table[decision_table[['GFAP_brain_Cre(+)_Ctrl_pass_cutoff_sum', 'GFAP_brain_Cre(+)_Fast_pass_cutoff_sum', 'GFAP_brain_Cre(+)_LPS_pass_cutoff_sum']].sum(axis=1) >= 1]
-            pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
-            pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
-            pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
+        norm_df = normalization_allcre_channels(df, treatment_labelling) 
+        assert len(norm_df) == len(df)
+        assert norm_df.columns.tolist() == df.columns.tolist()
 
-            #get scatterplots comaprisons: W7 vs W6, W8 vs W7, W9 vs W7, and W8 vs W9
-            pass_cutoff_true_df = pass_cutoff_true_df.set_index("entry_name")
-            df_scat_1 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W8")
-            df_scat_2 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W9")
-            df_scat_3 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W8_vs_W9")
+        pca_fig_2 = get_pca_plot(norm_df, "Normalized")
+        pca_fig_2.write_image(file_folder_path / "pca_norm_data.svg", engine="kaleido")
+        plot_list.append(pca_fig_2)
+        
+        norm_df_log = np.log2(norm_df)
+        norm_df_log.plot(kind='box', 
+                        rot=90, 
+                        fontsize=10, 
+                        title="Normalized", 
+                        ax=ax2, 
+                        xlabel="Channels", 
+                        ylabel="log2(SI)", 
+                        color = "darkblue")
+        
+        # this is what gets passed into cutoff analysis
+        normalized_dict[file_name] = norm_df
+        
+        fig.savefig(file_folder_path / ("box_plots_" + file_name + '.png'))
+        with open(file_folder_path / ("pca_plots_" + file_name + '.html'), 'w') as f:
+            f.write(file_name)
+            for fig in plot_list:
+                f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
-            scat_list = [df_scat_1, df_scat_2, df_scat_3]
-            scat_df = pd.concat(scat_list, axis=1)
-            
-            pass_cutoff_true_df = pass_cutoff_true_df.join(scat_df)
-            #pass_cutoff_true_df = pass_cutoff_true_df.drop(["pep_num", "annotation"], axis=1)
-            pass_cutoff_true_df = pass_cutoff_true_df.reset_index().set_index(["uniprot_id", "description", "pep_num", "annotation"])
-            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("GFAP_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
-        else: 
-            volcano_folder_path = tissue_file_folder_path / 'volcano_plot'
+    logging.info("FOLDER COMPLETE: 03_normalisation_plots")
+    return normalized_dict 
+
+def save_normalized_files(output_folder_path, list_of_file_names, normalized_dict):
+    # save normalized df in folder
+    logging.info('\n')
+    logging.info("Saving normalized tables")
+
+    folder_path = output_folder_path / "04_normalized"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    for file_name in list_of_file_names:
+        df = normalized_dict[file_name]
+        df.to_csv(folder_path / (file_name.split("processed_census-out_")[1] + ".csv"))
+
+    logging.info("FOLDER COMPLETE: 04_normalized")
+    return 
+
+def initialize_go_term_analysis():
+    # Initialization for go term analysis 
+    logging.info('\n')
+    logging.info("Starting initialization for go term analysis")
+    GeneID2nt_mus, inv_map, file_gene2go = read_in_ncbi_go_associations_data()
+    obodag, ns2assoc = initialize_godag_obj(file_gene2go)
+    goeaobj = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, reference_list=None)
+    GO_items = get_all_goterms(goeaobj)
+    return goeaobj, GO_items, inv_map, obodag, ns2assoc, GeneID2nt_mus
+
+def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_condition_dict, fasta_table, goeaobj, GO_items, inv_map, obodag, ns2assoc, GeneID2nt_mus):
+    # split tissue and serum 
+    logging.info('\n')
+    logging.info("Starting individual analysis for tissue and serum files...")
+
+    folder_path = output_folder_path / "05_results"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    tissue_folder_path = folder_path / "01_tissue"
+    if not os.path.exists(tissue_folder_path):
+        os.mkdir(tissue_folder_path)
+
+    serum_folder_path = folder_path / "02_serum"
+    if not os.path.exists(serum_folder_path):
+        os.mkdir(serum_folder_path)
+
+    for file_name in list_of_file_names:
+        # get data
+        df = normalized_dict[file_name]
+        conditions_list = file_condition_dict[file_name]["conditions"]
+        control_labelling = file_condition_dict[file_name]["control_labelling"]
+        treatment_labelling = file_condition_dict[file_name]["treatment_labelling"]
+        file_type = file_condition_dict[file_name]["file_type"]
+        cutoff_dict = {}
+        
+        logging.info('\n')
+        logging.info("Processing file: %s", file_name)
+        
+        if file_type == "serum": 
+            serum_file_folder_path = serum_folder_path / file_name.split("processed_census-out_")[1]
+            if not os.path.exists(serum_file_folder_path):
+                os.mkdir(serum_file_folder_path)
+
+            volcano_folder_path = serum_file_folder_path / 'volcano_plot'
             if not os.path.exists(volcano_folder_path):
                 os.mkdir(volcano_folder_path)
 
-            volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, volcano_folder_path)
-            pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
-            pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
+            volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, volcano_folder_path)
             
-            heatmap_folder_path = tissue_file_folder_path / 'heatmap_plot'
+            heatmap_folder_path = serum_file_folder_path / 'heatmap_plot'
             if not os.path.exists(heatmap_folder_path):
                 os.mkdir(heatmap_folder_path)
             
-            get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, heatmap_folder_path)
+            get_heatmap(df, treatment_labelling, volcano_df, file_name, heatmap_folder_path)
+            df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
+            annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
+            annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
             
-            goterm_analysis_folder_path = tissue_file_folder_path / 'goterm_analysis'
+            goterm_analysis_folder_path = serum_file_folder_path / 'goterm_analysis'
             if not os.path.exists(goterm_analysis_folder_path):
                 os.mkdir(goterm_analysis_folder_path)
 
@@ -416,7 +325,7 @@ for file_name in list_of_file_names:
             if not os.path.exists(full_mouse_genome_folder_path):
                 os.mkdir(full_mouse_genome_folder_path)
 
-            get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, full_mouse_genome_folder_path, 'full_mouse_genome')
+            get_up_down_goterm(annotated_protein_df, goeaobj, GO_items, inv_map, full_mouse_genome_folder_path, 'full_mouse_genome')
             
             exp_ref_folder_path = goterm_analysis_folder_path / 'experiment_specific_background'
             if not os.path.exists(exp_ref_folder_path):
@@ -427,9 +336,107 @@ for file_name in list_of_file_names:
             gene_id_list = ref_df.reset_index().set_index("uniprot_id").join(fasta_table["gene_id"]).gene_id.tolist()
             goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
             GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
-            get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
+            get_up_down_goterm(annotated_protein_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
 
-logging.info('\n')
-logging.info("Program finished")
+        elif file_type == "tissue":
+            tissue_file_folder_path = tissue_folder_path / file_name.split("processed_census-out_")[1]
+            if not os.path.exists(tissue_file_folder_path):
+                os.mkdir(tissue_file_folder_path)
 
-# %%
+            cutoff_roc_path = tissue_file_folder_path / "01_cutoff_ROC_filter"
+            if not os.path.exists(cutoff_roc_path):
+                os.mkdir(cutoff_roc_path)
+            decision_table, cutoff_plots_table = get_ratios_and_cutoffs(df, conditions_list, control_labelling, treatment_labelling, cutoff_roc_path, cutoff_dict, file_name, fasta_table)
+            get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutoff_dict)
+
+            pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
+            
+            pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
+            pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
+
+            if file_name == "processed_census-out_04172023_CRW_A-5_16pl_M":
+                volcano_df = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
+                pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
+                pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("BAT_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
+
+                pass_cutoff_true_df = decision_table[decision_table[['GFAP_brain_Cre(+)_Ctrl_pass_cutoff_sum', 'GFAP_brain_Cre(+)_Fast_pass_cutoff_sum', 'GFAP_brain_Cre(+)_LPS_pass_cutoff_sum']].sum(axis=1) >= 1]
+                pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
+                pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
+                pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
+
+                #get scatterplots comaprisons: W7 vs W6, W8 vs W7, W9 vs W7, and W8 vs W9
+                pass_cutoff_true_df = pass_cutoff_true_df.set_index("entry_name")
+                df_scat_1 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W8")
+                df_scat_2 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Ctrl_W7/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W7_vs_W9")
+                df_scat_3 = scatterplot_plot(pass_cutoff_true_df[['ratio_GFAP_brain_Cre(+)_Fast_W8/GFAP_brain_Cre(-)_Ctrl_W6', 'ratio_GFAP_brain_Cre(+)_LPS_W9/GFAP_brain_Cre(-)_Ctrl_W6']], tissue_file_folder_path, "W8_vs_W9")
+
+                scat_list = [df_scat_1, df_scat_2, df_scat_3]
+                scat_df = pd.concat(scat_list, axis=1)
+                
+                pass_cutoff_true_df = pass_cutoff_true_df.join(scat_df)
+                #pass_cutoff_true_df = pass_cutoff_true_df.drop(["pep_num", "annotation"], axis=1)
+                pass_cutoff_true_df = pass_cutoff_true_df.reset_index().set_index(["uniprot_id", "description", "pep_num", "annotation"])
+                pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("GFAP_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
+            else: 
+                volcano_folder_path = tissue_file_folder_path / 'volcano_plot'
+                if not os.path.exists(volcano_folder_path):
+                    os.mkdir(volcano_folder_path)
+
+                volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, volcano_folder_path)
+                pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
+                pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
+                
+                heatmap_folder_path = tissue_file_folder_path / 'heatmap_plot'
+                if not os.path.exists(heatmap_folder_path):
+                    os.mkdir(heatmap_folder_path)
+                
+                get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_name, heatmap_folder_path)
+                
+                goterm_analysis_folder_path = tissue_file_folder_path / 'goterm_analysis'
+                if not os.path.exists(goterm_analysis_folder_path):
+                    os.mkdir(goterm_analysis_folder_path)
+
+                full_mouse_genome_folder_path = goterm_analysis_folder_path / 'full_mouse_genome_background'
+                if not os.path.exists(full_mouse_genome_folder_path):
+                    os.mkdir(full_mouse_genome_folder_path)
+
+                get_up_down_goterm(pass_cutoff_true_df, goeaobj, GO_items, inv_map, full_mouse_genome_folder_path, 'full_mouse_genome')
+                
+                exp_ref_folder_path = goterm_analysis_folder_path / 'experiment_specific_background'
+                if not os.path.exists(exp_ref_folder_path):
+                    os.mkdir(exp_ref_folder_path)
+
+                # goterms with reference list 
+                ref_df = normalized_dict[file_name]
+                gene_id_list = ref_df.reset_index().set_index("uniprot_id").join(fasta_table["gene_id"]).gene_id.tolist()
+                goeaobj_ref_list = create_godag_obj(obodag, ns2assoc, GeneID2nt_mus, gene_id_list)
+                GO_items_ref_list = get_all_goterms(goeaobj_ref_list)
+                get_up_down_goterm(pass_cutoff_true_df, goeaobj_ref_list, GO_items_ref_list, inv_map, exp_ref_folder_path, 'ref_list')
+
+    logging.info('\n')
+    logging.info("Program finished")
+    return
+
+def turbo_id_analysis(input_folder_path, output_folder_path, fasta_table_path):
+    #commit_sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip() 
+    #input_folder_path = Path(paths_dict['input_folder_path'])
+    #output_folder_path = Path(paths_dict['output_folder_path'])
+    #fasta_table_path = Path(paths_dict['fasta_table_path'])
+    logging.basicConfig(filename=output_folder_path / 'turboid_analysis.log', 
+                        filemode='w', 
+                        encoding='utf-8', 
+                        level=logging.INFO, 
+                        format='%(asctime)s %(message)s', 
+                        datefmt='%m/%d/%Y %I:%M:%S %p')
+    logging.info('Program starting')
+    #logging.info('Gitcommit sha: %s', commit_sha)
+
+    fasta_table = read_in_fasta_table(fasta_table_path)
+    list_of_file_paths, file_channel_dict, list_of_file_names, file_condition_dict = get_list_of_files(input_folder_path)
+    dfs_dict =  assign_column_names_clean_keratins_and_contaminants(fasta_table, output_folder_path, list_of_file_paths, file_channel_dict)
+    filtered_dict = filter_based_on_cond(output_folder_path, list_of_file_names, dfs_dict, file_condition_dict)
+    normalized_dict = normalization_plots(output_folder_path, list_of_file_names, filtered_dict, file_condition_dict)
+    save_normalized_files(output_folder_path, list_of_file_names, normalized_dict)
+    goeaobj, GO_items, inv_map, obodag, ns2assoc, GeneID2nt_mus = initialize_go_term_analysis()
+    roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_condition_dict, fasta_table, goeaobj, GO_items, inv_map, obodag, ns2assoc, GeneID2nt_mus)
+    return 
