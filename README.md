@@ -44,7 +44,7 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
   - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation, also if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
   - crossreference table with secretion prediction resource shared by Corey 
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
-  - crossreference table with Crapome database
+  - crossreference table with Crapome database - cutoff > 200
   - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
   - save table
   - Number of TP proteins: 2806
@@ -63,7 +63,7 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
   - if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
   - crossreference table with secretion prediction resource shared by Corey 
   - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
-  - crossreference table with Crapome database
+  - crossreference table with Crapome database - cutoff > 200
   - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
   - save table
   - Number of TP proteins: 1602
