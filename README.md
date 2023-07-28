@@ -1,14 +1,22 @@
 # TurboID
 
-
+Note for step to step guide: see templates/metadata_turbo_id.xlsx, Analysis details tab
 ### **Step 1 (processing of raw census-out files)**
-
+---------------------------------------------------------------------------------------------------------------------------------------------
+Windows: 
 - Open Windows remote 
 - Open powershell as administrator 
 - type: cd /Users/Public
 - .\start_pipeline.ps1 process_file_folder
+
+Mac with Docker installed: 
+- go to data analysis pipeline folder (where start_pipeline.sh is located, note this project is in gitlab/data_analysis_pipeline) 
+- docker build -t vino_ms . 
+- ./start_pipeline.sh process_file_folder
+
 - enter input folder path: copy path to where the census file folder is 
 - enter output folder path: copy path to where you want to save everything
+---------------------------------------------------------------------------------------------------------------------------------------------
 
 Files were processed with the Vinogradova Lab pipeline and were treated as “whole proteome” files – i.e., we quantify protein expression changes and corresponding peptide values were summed to receive the respective raw signal intensity per protein
 
@@ -23,7 +31,7 @@ Files were processed with the Vinogradova Lab pipeline and were treated as “wh
 
 Note: make sure to add (copy from old folders) both conditions_metadata.csv and metadata_col.csv - these files are needed for renaming the channels as well as specifying which are cre- and cre+ conditions
 
-### **Step 2a (mouse_fasta_to_FP_TP_tables_without_signalp.py)**
+### **Step 2a (mouse_fasta_to_FP_TP_tables_without_signalp.py) - This step is for reference in case fasta file tables need to be modified!**
 - create main table (based off of our mouse fasta file used for IP2 search)
   - read in fasta file to get all uniprot IDs
   - use uniprot.org to get all annotations for these proteins
@@ -41,7 +49,7 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
   - Number of TP proteins: 2806
   - Number of FP proteins: 435
 
-### **Step 2b (mouse_fasta_to_FP_TP_tables_with_signalp.py)**
+### **Step 2b (mouse_fasta_to_FP_TP_tables_with_signalp.py) - This step is for reference in case fasta file tables need to be modified!**
 - create main table (based off of our mouse fasta file used for IP2 search)
   - read in fasta file to get all uniprot IDs
   - use uniprot.org to get all annotations for these proteins
@@ -63,10 +71,20 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
 
 ### **Step 3 (turboid_analysis_pipeline.py)**
 
-  - `conda activate turbo_id_notebook`
-  - `python turboid_analysis_pipeline.py` (in tuboid/scripts folder)
+---------------------------------------------------------------------------------------------------------------------------------------------
+Windows: 
+- Open Windows remote 
+- Open powershell as administrator 
+- type: cd /Users/Public
+- .\start_turbo_id_downstream.ps1 process_data
 
-  - read in data and metadata 
+Mac with Docker installed: 
+- go to data turboid folder (where start_turbo_id_downstream.sh is located)
+- docker build -t turboid_downstream . 
+- ./start_turbo_id_downstream.sh process_data
+
+follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
+---------------------------------------------------------------------------------------------------------------------------------------------
   
 **01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated**
   - read in each experiment, rename channels, remove keratins, annotate if TP or FP
@@ -159,6 +177,26 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
      - “TPR-FPR” columns: True positive rate – False positive rate for this protein (y axis in line plot)
      - “pass_cutoff” columns: 1/0  = passed cutoff/did not pass cutoff
 
+
+### **Step 4 (create_lists_for_yuval.py)**
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+Windows: 
+- Open Windows remote 
+- Open powershell as administrator 
+- type: cd /Users/Public
+- .\start_turbo_id_downstream.ps1 create_lists_for_yuvals_group
+
+Mac with Docker installed: 
+- go to data turboid folder (where start_turbo_id_downstream.sh is located)
+- docker build -t turboid_downstream . 
+- ./start_turbo_id_downstream.sh create_lists_for_yuvals_group
+
+follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+This script finds all significantly up and down regulated proteins per comprison from all files, and merges it together into one file. We want to avoid havng duplciates so that we can send a protein list (human uniprot id column) to collaborators. 
 
 **Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M**
 - condition scheme does not match other files so needed to make follwing changes:
