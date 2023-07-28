@@ -7,7 +7,7 @@ import openpyxl
 import json
 from functools import reduce 
 from operator import concat
-from src.fasta_table_funcs import *
+from fasta_table_funcs import *
 import math
 import warnings 
 warnings.simplefilter("ignore")

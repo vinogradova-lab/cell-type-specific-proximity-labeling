@@ -7,7 +7,7 @@ from sklearn.decomposition import PCA
 import plotly.express as px
 import scipy.stats as stat
 from functools import reduce
-from src.filter_funcs import get_condition_df
+from filter_funcs import get_condition_df
 
 color_discrete_map = {'Significant Up': '#ff8080', 
                       'Not Significant Up': '#ffcccc', 

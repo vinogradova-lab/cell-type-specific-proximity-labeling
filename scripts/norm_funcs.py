@@ -54,7 +54,7 @@ def normalization_allcre_channels(df, treatment_labelling):
     norm_factor_series.append(norm_factors)
 
     norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
-    print(norm_factor)
+    #print(norm_factor)
     #logging.info("Normalization factors")
     #logging.info(norm_factor)
 
@@ -75,7 +75,7 @@ def normalization_all_channels(df):
 
     norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
     #logging.info("Normalization factors")
-    print(norm_factor)
+    #print(norm_factor)
     #logging.info(norm_factor)
 
     normalized_df = df[norm_factor.index] * norm_factor
@@ -100,7 +100,7 @@ def normalization_all_channels_median(df):
 
     norm_factor = pd.concat(norm_factor_series, axis=1).sum(1)
     #logging.info("Normalization factors")
-    print(norm_factor)
+    #print(norm_factor)
     #logging.info(norm_factor)
 
     normalized_df = df[norm_factor.index] / norm_factor
