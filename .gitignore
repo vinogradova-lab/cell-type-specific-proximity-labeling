@@ -607,8 +607,3 @@ FodyWeavers.xsd
 
 
 .vscode
-
-scripts/gene2go
-scripts/gene_result.txt
-scripts/genes_ncbi_10090_proteincoding.py
-scripts/go-basic.obo
