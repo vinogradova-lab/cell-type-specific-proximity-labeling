@@ -14,6 +14,7 @@ Mac with Docker installed:
 - docker build -t vino_ms . 
 - ./start_pipeline.sh process_file_folder
 
+Then: 
 - enter input folder path: copy path to where the census file folder is 
 - enter output folder path: copy path to where you want to save everything
 ---------------------------------------------------------------------------------------------------------------------------------------------
@@ -83,7 +84,8 @@ Mac with Docker installed:
 - docker build -t turboid_downstream . 
 - ./start_turbo_id_downstream.sh process_data
 
-follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
+Then: 
+- follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
 ---------------------------------------------------------------------------------------------------------------------------------------------
   
 **01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated**
@@ -193,10 +195,13 @@ Mac with Docker installed:
 - docker build -t turboid_downstream . 
 - ./start_turbo_id_downstream.sh create_lists_for_yuvals_group
 
-follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
+Then: 
+- follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
 ---------------------------------------------------------------------------------------------------------------------------------------------
 
 This script finds all significantly up and down regulated proteins per comprison from all files, and merges it together into one file. We want to avoid havng duplciates so that we can send a protein list (human uniprot id column) to collaborators. 
+
+### **Other Notes:**
 
 **Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M**
 - condition scheme does not match other files so needed to make follwing changes:
