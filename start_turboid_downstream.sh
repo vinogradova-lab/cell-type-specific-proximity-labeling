@@ -12,7 +12,7 @@ then
   echo "Enter your output folder path:"
   read OUTPUTFOLDER
   echo ""
-  echo "Enter your fasta table file path (file name: main_fasta_table_without_signal_p.csv):"
+  echo "Enter the folder path to the fasta table file (please provide folder where the file is located)"
   read FASTATABLE
   echo ""
   docker run -t -i -v $INPUTFOLDER:/work_dir/input_folder -v $OUTPUTFOLDER:/work_dir/output_folder -v $FASTATABLE:/work_dir/fasta_table_tp_fp_list turboid_downstream $1
@@ -25,7 +25,7 @@ then
   echo "Enter your output folder path:"
   read OUTPUTFOLDER
   echo ""
-  echo "Enter your fasta table file path (file name: main_fasta_table_without_signal_p.csv):"
+  echo "Enter the folder path to the fasta table file (please provide folder where the file is located)"
   read FASTATABLE
   echo ""
   docker run -t -i -v $OUTPUTFOLDER:/work_dir/output_folder -v $FASTATABLE:/work_dir/fasta_table_tp_fp_list turboid_downstream $1

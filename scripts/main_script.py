@@ -7,6 +7,13 @@ from turboid_analysis_pipeline import turbo_id_analysis
 from create_lists_for_yuval import get_lists_for_yuvals_group
 
 def process_data(): 
+
+    info_message = (
+                questionary.select(
+                    "Before you continue please make sure your 01_processed_files contains following files: conditions_metadata.csv and metadata_col.csv, please fill out both files according to templates (for templates, see gitlab/turboid/templates",
+                    choices=['done!']
+                ).ask()
+            )
     
     workdir_path = pathlib.Path.cwd()
     input_folder_path = get_input_output_folder(workdir_path, "input_folder")
@@ -17,11 +24,22 @@ def process_data():
     input_folder_path = input_folder_path / "01_processed_files"
 
     output_folder_path = pathlib.Path(output_folder_path)
-    output_dir_name = (questionary.text("How do you want to label this run? - make sure to mention if it is 1 pep or 2 pep per protein").ask())
+    output_dir_name = (questionary.text("How do you want to label this run? - make sure to mention if it is 1 pep or 2 pep per protein:").ask())
     output_folder_path = output_folder_path / output_dir_name
     os.mkdir(output_folder_path)
 
     fasta_table_path = pathlib.Path(fasta_table_path)
+    files_list = list(fasta_table_path.iterdir())
+    files_list_stem = [file.name for file in files_list if file.suffix == ".csv"]
+
+    select_file = (
+                questionary.select(
+                    "Please select your fasta file table which contains TP and FP labelling",
+                    choices=files_list_stem
+                ).ask()
+            )
+
+    fasta_table_path = fasta_table_path / select_file
 
     turbo_id_analysis(input_folder_path, output_folder_path, fasta_table_path)
 
@@ -40,7 +58,19 @@ def create_lists_for_yuvals_group():
     fasta_table_path = get_input_output_folder(workdir_path, "fasta_table_tp_fp_list")
 
     output_folder_path = pathlib.Path(output_folder_path)
+    
     fasta_table_path = pathlib.Path(fasta_table_path)
+    files_list = list(fasta_table_path.iterdir())
+    files_list_stem = [file.name for file in files_list if file.suffix == ".csv"]
+
+    select_file = (
+                questionary.select(
+                    "Please select your fasta file table which contains TP and FP labelling",
+                    choices=files_list_stem
+                ).ask()
+            )
+
+    fasta_table_path = fasta_table_path / select_file
 
     get_lists_for_yuvals_group(output_folder_path, fasta_table_path)
 
