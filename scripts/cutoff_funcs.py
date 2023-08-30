@@ -258,6 +258,7 @@ def get_expr(row):
 
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
+    conditions_list = [i.split('|')[0] for i in conditions_list]
     volcano_plot_list = []
     volcano_df_list = []
     if len(conditions_list) == 2:
@@ -273,7 +274,6 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             
         trt_col_df["FC"] = trt_col_df["mean_"+conditions_list[0]+"_"+treatment_labelling] / trt_col_df["mean_"+conditions_list[1]+"_"+treatment_labelling]
         x_axis_name = "log2(" + conditions_list[0] +"/" + conditions_list[1] +")"
-    
         idx_cond_1 = trt_col_df.columns.get_indexer(list_cond_1)
         idx_cond_2 = trt_col_df.columns.get_indexer(list_cond_2)
         trt_col_df["p_value"] = trt_col_df.apply(get_p_value, axis=1, args=(idx_cond_1, idx_cond_2), )
@@ -621,6 +621,8 @@ def get_ratios_and_cutoffs(df,
     ratio_and_signal_intensity.set_index(['uniprot_id', 'description', 'pep_num', 'annotation'], inplace=True)
     
     for condition in conditions_list:
+        if "|" in condition: 
+            condition = condition.split("|")[0]
         ratio_condition_cols = ratio_and_signal_intensity.filter(like="ratio_"+condition).columns.tolist()
         ratio_and_signal_intensity["median_R("+condition+")"] = ratio_and_signal_intensity[ratio_condition_cols].median(axis=1)
     
@@ -628,6 +630,8 @@ def get_ratios_and_cutoffs(df,
     column_list = [colname for colname in column_list if "ratio" not in colname]
     
     for condition in conditions_list:
+        if "|" in condition: 
+            condition = condition.split("|")[0]
         conditions_cols_pos = [colname for colname in column_list if condition+"_"+treatment_labelling in colname]
         if len(conditions_cols_pos) == 0:
             conditions_cols_pos = [colname for colname in column_list if condition+treatment_labelling in colname]
