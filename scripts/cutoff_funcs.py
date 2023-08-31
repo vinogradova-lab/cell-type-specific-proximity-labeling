@@ -670,7 +670,9 @@ def get_ratios_and_cutoffs(df,
 
 
 def get_before_after_cutoff_barplots(decision_table, pass_cutoff_path, file_name):
-    pass_cutoff_true_df = decision_table[decision_table.pass_cutoff_result == True]   
+    pass_cutoff_true_df = decision_table[decision_table.pass_cutoff_result == True]
+    if len(pass_cutoff_true_df) == 0:
+        return pass_cutoff_true_df
     pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
     pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
     #pass_cutoff_true_df = pass_cutoff_true_df.reset_index()
@@ -952,6 +954,10 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
 
     subset_for_heatmap = subset_for_heatmap.reset_index("uniprot_id")
     subset_for_heatmap = subset_for_heatmap.drop("uniprot_id", axis=1).set_index("description")
+
+    if len(subset_for_heatmap) == 1: 
+        subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
+        return "done"
 
     g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(color_heatmap_up, color_heatmap_down, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     g.ax_row_dendrogram.set_visible(False)

@@ -350,6 +350,9 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
             get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutoff_dict)
 
             pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
+            if len(pass_cutoff_true_df) == 0: 
+                logging.info("File: %s, none of the proteins pass into final list", file_name)
+                continue
             
             pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
             pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
