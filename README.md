@@ -1,11 +1,11 @@
 # TurboID
 
-Note for step to step guide: see templates/metadata_turbo_id.xlsx, Analysis details tab
+Note for step to step guide: see /Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/02_metadata/metadata_turbo_id.xlsx, Analysis details tab - Access to Vinogradova Lab Windows Remote Desktop is necessary
 
 ### **Step 0 (set up pipeline)**
 ---------------------------------------------------------------------------------------------------------------------------------------------
 - docker build -t turboid_downstream . 
-- docker save > turboid_downstream.tar
+- docker save turboid_downstream > turboid_downstream_date.tar
 - move tar to windows remote 
 - docker image load -i turboid_downstream.tar
 
@@ -13,7 +13,7 @@ Note for step to step guide: see templates/metadata_turbo_id.xlsx, Analysis deta
 ---------------------------------------------------------------------------------------------------------------------------------------------
 Windows: 
 - Open Windows remote 
-- Open powershell as administrator 
+- Open powershell 
 - type: cd /Users/Public
 - .\start_pipeline.ps1 process_file_folder
 
