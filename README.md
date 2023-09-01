@@ -1,6 +1,14 @@
 # TurboID
 
 Note for step to step guide: see templates/metadata_turbo_id.xlsx, Analysis details tab
+
+### **Step 0 (set up pipeline)**
+---------------------------------------------------------------------------------------------------------------------------------------------
+- docker build -t turboid_downstream . 
+- docker save > turboid_downstream.tar
+- move tar to windows remote 
+- docker image load -i turboid_downstream.tar
+
 ### **Step 1 (processing of raw census-out files)**
 ---------------------------------------------------------------------------------------------------------------------------------------------
 Windows: 
