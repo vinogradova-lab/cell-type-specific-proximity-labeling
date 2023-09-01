@@ -26,6 +26,8 @@ def get_lists_for_yuvals_group(output_folder_path, fasta_table_path):
                                 'Symbol_human_jackson_homology_db',
                                 'contaminant']]
 
+    
+    fasta_file_data["name"] = fasta_file_data["description"].str.split(" ").str[1].str.split(" ").str[0]
 
     # collect all final lists 
     # 05_results / 01_tissue and 02_serum / for each file folder get final protein table 
@@ -52,7 +54,7 @@ def get_lists_for_yuvals_group(output_folder_path, fasta_table_path):
     for file, path in dict_of_df_paths.items(): 
         logging.info(file)
         df = pd.read_csv(path)
-        cols = df.filter(regex="Regulation").columns.tolist()
+        cols = df.filter(regex="Regulation").columns.tolist() # p_value|log2_FC|-log10_pval|
         df = df.set_index("uniprot_id")
         df = df[cols]
         df = df[df.isin(list_of_values).any(axis=1)]
@@ -75,6 +77,34 @@ def get_lists_for_yuvals_group(output_folder_path, fasta_table_path):
         os.mkdir(folder_path)
 
     final_list.to_csv(folder_path / 'list_for_gof_lof_variants_and_phewas.csv')
+
+
+    # get all 
+    nofilter_list = []
+    for file, path in dict_of_df_paths.items(): 
+        logging.info(file)
+        df = pd.read_csv(path)
+        cols = df.filter(regex="p_value|log2_FC|-log10_pval|Regulation").columns.tolist() 
+        df = df.set_index("uniprot_id")
+        df = df[cols]
+        nofilter_list.append(df)
+
+    assert len(nofilter_list) == len(dict_of_df_paths)
+
+    final_list = pd.concat(nofilter_list, axis=1)
+    cols = final_list.columns.tolist()
+    final_list = final_list.reset_index()
+
+
+    final_list = final_list.reset_index().merge(fasta_file_data.reset_index(), how="left", on="uniprot_id")
+    final_list = final_list.drop("index", axis= 1)
+
+
+    folder_path = output_folder_path / "06_lists_for_gof_lof_variants_and_phewas"
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    final_list.to_csv(folder_path / 'all_results_merged.csv')
     return
 
 #with_contaminans_path = "/Users/nropek/Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/03_results/03_downstream_analysis/230608_results_without_signalp/min_1_pep_per_protein/06_lists_for_gof_lof_variants_and_phewas/list_for_gof_lof_variants_and_phewas.csv"

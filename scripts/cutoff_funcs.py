@@ -258,6 +258,7 @@ def get_expr(row):
 
 
 def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df, file_name, folder_path):
+    conditions_list = [i.split('|')[0] for i in conditions_list]
     volcano_plot_list = []
     volcano_df_list = []
     if len(conditions_list) == 2:
@@ -273,7 +274,6 @@ def get_volcano_plot(conditions_list, control_labelling, treatment_labelling, df
             
         trt_col_df["FC"] = trt_col_df["mean_"+conditions_list[0]+"_"+treatment_labelling] / trt_col_df["mean_"+conditions_list[1]+"_"+treatment_labelling]
         x_axis_name = "log2(" + conditions_list[0] +"/" + conditions_list[1] +")"
-    
         idx_cond_1 = trt_col_df.columns.get_indexer(list_cond_1)
         idx_cond_2 = trt_col_df.columns.get_indexer(list_cond_2)
         trt_col_df["p_value"] = trt_col_df.apply(get_p_value, axis=1, args=(idx_cond_1, idx_cond_2), )
@@ -465,7 +465,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
     volcano_df_list = []
 
     for condition in conditions_list:
-        cond_cols_df = df.filter(like=condition)
+        cond_cols_df = df.filter(regex=condition)
         list_cond_1 = cond_cols_df.filter(like=treatment_labelling).columns.tolist()
         list_cond_2 = cond_cols_df.filter(like=control_labelling).columns.tolist()
         if len(list_cond_1) <= 1 or len(list_cond_2) <= 1:
@@ -480,7 +480,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
             cond_cols_df["mean_"+condition+"_"+labelling] = labelling_df.mean(axis=1)
             
         cond_cols_df["FC"] = cond_cols_df["mean_"+condition+"_"+treatment_labelling] / cond_cols_df["mean_"+condition+"_"+control_labelling]
-        x_axis_name = "log2(" + condition + "_" + treatment_labelling + "/" + condition + "_" + control_labelling + ")"
+        x_axis_name = "log2(" + condition + "_" + treatment_labelling + "/" + control_labelling + ")"
 
         idx_cond_1 = cond_cols_df.columns.get_indexer(list_cond_1)
         idx_cond_2 = cond_cols_df.columns.get_indexer(list_cond_2)
@@ -499,7 +499,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.set_index(["annotation"])
         volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
 
-        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + condition + "_" + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
+        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
         #my_order = ["Down", "Stable", "Up"]
         #my_order = ["Significant Stable", "Stable", "Significant Up", "Up"]
         #my_order = ["Stable", "Up"]
@@ -524,7 +524,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
         fig.update_layout(legend=dict(title=""), title_x=0.5, font_family="Arial")
         
-        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+        fig.write_image(folder_path / 'volcano_plot' / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
         sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(30)
         sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(30)
@@ -554,7 +554,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.add_suffix("_"+title_name)
         volcano_df_list.append(volcano_df)
         
-    with open(folder_path / 'volcano_plots.html' , 'w') as f:
+    with open(folder_path / 'volcano_plot' /'volcano_plots_trt_vs_ctrl.html' , 'w') as f:
         for fig in volcano_plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
@@ -621,6 +621,8 @@ def get_ratios_and_cutoffs(df,
     ratio_and_signal_intensity.set_index(['uniprot_id', 'description', 'pep_num', 'annotation'], inplace=True)
     
     for condition in conditions_list:
+        if "|" in condition: 
+            condition = condition.split("|")[0]
         ratio_condition_cols = ratio_and_signal_intensity.filter(like="ratio_"+condition).columns.tolist()
         ratio_and_signal_intensity["median_R("+condition+")"] = ratio_and_signal_intensity[ratio_condition_cols].median(axis=1)
     
@@ -628,6 +630,8 @@ def get_ratios_and_cutoffs(df,
     column_list = [colname for colname in column_list if "ratio" not in colname]
     
     for condition in conditions_list:
+        if "|" in condition: 
+            condition = condition.split("|")[0]
         conditions_cols_pos = [colname for colname in column_list if condition+"_"+treatment_labelling in colname]
         if len(conditions_cols_pos) == 0:
             conditions_cols_pos = [colname for colname in column_list if condition+treatment_labelling in colname]
@@ -666,7 +670,9 @@ def get_ratios_and_cutoffs(df,
 
 
 def get_before_after_cutoff_barplots(decision_table, pass_cutoff_path, file_name):
-    pass_cutoff_true_df = decision_table[decision_table.pass_cutoff_result == True]   
+    pass_cutoff_true_df = decision_table[decision_table.pass_cutoff_result == True]
+    if len(pass_cutoff_true_df) == 0:
+        return pass_cutoff_true_df
     pass_cutoff_cols = pass_cutoff_true_df.filter(like="pass_cutoff").columns.tolist()
     pass_cutoff_true_df = pass_cutoff_true_df.drop(pass_cutoff_cols, axis = 1)
     #pass_cutoff_true_df = pass_cutoff_true_df.reset_index()
@@ -948,6 +954,10 @@ def get_heatmap(pass_cutoff_df_norm_data, treatment_labelling, volcano_df, file_
 
     subset_for_heatmap = subset_for_heatmap.reset_index("uniprot_id")
     subset_for_heatmap = subset_for_heatmap.drop("uniprot_id", axis=1).set_index("description")
+
+    if len(subset_for_heatmap) == 1: 
+        subset_for_heatmap_merged.to_csv(folder_path / "heatmap_data.csv") 
+        return "done"
 
     g = sns.clustermap(subset_for_heatmap, z_score=0, cmap=sns.diverging_palette(color_heatmap_up, color_heatmap_down, s=60, as_cmap=True), center=0, figsize=(12,int(len(subset_for_heatmap) / 5 )), yticklabels=True)
     g.ax_row_dendrogram.set_visible(False)

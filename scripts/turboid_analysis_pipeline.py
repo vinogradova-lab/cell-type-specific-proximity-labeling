@@ -350,11 +350,17 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
             get_tp_fp_cutoff_plots(cutoff_plots_table, cutoff_roc_path, file_name, cutoff_dict)
 
             pass_cutoff_true_df = get_before_after_cutoff_barplots(decision_table, tissue_file_folder_path, file_name)
+            if len(pass_cutoff_true_df) == 0: 
+                logging.info("File: %s, none of the proteins pass into final list", file_name)
+                continue
             
             pass_cutoff_df_norm_data = df.reset_index()[df.reset_index()["uniprot_id"].isin(pass_cutoff_true_df.uniprot_id.tolist())].set_index(["uniprot_id", "description", "pep_num", "annotation"])
             pass_cutoff_true_df = pass_cutoff_true_df.drop("index", axis=1).set_index("uniprot_id")
 
             if file_name == "processed_census-out_04172023_CRW_A-5_16pl_M":
+                volcano_folder_path = tissue_file_folder_path / 'volcano_plot'
+                if not os.path.exists(volcano_folder_path):
+                    os.mkdir(volcano_folder_path)
                 volcano_df = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
                 pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
                 pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("BAT_final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))
@@ -382,6 +388,7 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
                 if not os.path.exists(volcano_folder_path):
                     os.mkdir(volcano_folder_path)
 
+                volcano_df_trt_vs_ctrl = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
                 volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, volcano_folder_path)
                 pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
                 pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
