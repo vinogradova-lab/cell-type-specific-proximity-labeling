@@ -499,7 +499,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.set_index(["annotation"])
         volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
 
-        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
+        title_name = file_name + " - " + condition.replace("|", "vs") + "_" +treatment_labelling + "vs." + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
         #my_order = ["Down", "Stable", "Up"]
         #my_order = ["Significant Stable", "Stable", "Significant Up", "Up"]
         #my_order = ["Stable", "Up"]
