@@ -385,6 +385,7 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
                 if not os.path.exists(volcano_folder_path):
                     os.mkdir(volcano_folder_path)
 
+                volcano_df_trt_vs_ctrl = get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, tissue_file_folder_path)
                 volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, volcano_folder_path)
                 pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
                 pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   

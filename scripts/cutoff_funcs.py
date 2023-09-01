@@ -465,7 +465,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
     volcano_df_list = []
 
     for condition in conditions_list:
-        cond_cols_df = df.filter(like=condition)
+        cond_cols_df = df.filter(regex=condition)
         list_cond_1 = cond_cols_df.filter(like=treatment_labelling).columns.tolist()
         list_cond_2 = cond_cols_df.filter(like=control_labelling).columns.tolist()
         if len(list_cond_1) <= 1 or len(list_cond_2) <= 1:
@@ -480,7 +480,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
             cond_cols_df["mean_"+condition+"_"+labelling] = labelling_df.mean(axis=1)
             
         cond_cols_df["FC"] = cond_cols_df["mean_"+condition+"_"+treatment_labelling] / cond_cols_df["mean_"+condition+"_"+control_labelling]
-        x_axis_name = "log2(" + condition + "_" + treatment_labelling + "/" + condition + "_" + control_labelling + ")"
+        x_axis_name = "log2(" + condition + "_" + treatment_labelling + "/" + control_labelling + ")"
 
         idx_cond_1 = cond_cols_df.columns.get_indexer(list_cond_1)
         idx_cond_2 = cond_cols_df.columns.get_indexer(list_cond_2)
@@ -499,7 +499,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.set_index(["annotation"])
         volcano_df["name"] = volcano_df['description'].str.split(" ").str[0]
 
-        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + condition + "_" + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
+        title_name = file_name + " - " + condition + "_" +treatment_labelling + " vs. " + control_labelling + " (" + str(len(volcano_df)) + " Proteins)"
         #my_order = ["Down", "Stable", "Up"]
         #my_order = ["Significant Stable", "Stable", "Significant Up", "Up"]
         #my_order = ["Stable", "Up"]
@@ -524,7 +524,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         fig.add_hline(y=1.3, line_width=2, line_dash="dash", line_color="grey")
         fig.update_layout(legend=dict(title=""), title_x=0.5, font_family="Arial")
         
-        fig.write_image(folder_path / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
+        fig.write_image(folder_path / 'volcano_plot' / ("volcano_plot_" + title_name.split(" - ")[1].split(" (")[0] + ".svg"), engine="kaleido")
 
         sign_up_df = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="-log10_pval", ascending=False).head(30)
         sign_up_df_fc = volcano_df.loc[volcano_df["Regulation"] == "Significant Up"].sort_values(by="log2_FC", ascending=False).head(30)
@@ -554,7 +554,7 @@ def get_volcano_plot_treatment_vs_control(conditions_list, control_labelling, tr
         volcano_df = volcano_df.add_suffix("_"+title_name)
         volcano_df_list.append(volcano_df)
         
-    with open(folder_path / 'volcano_plots.html' , 'w') as f:
+    with open(folder_path / 'volcano_plot' /'volcano_plots_trt_vs_ctrl.html' , 'w') as f:
         for fig in volcano_plot_list:
             f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
 
