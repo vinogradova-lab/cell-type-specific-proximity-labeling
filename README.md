@@ -94,6 +94,8 @@ Mac with Docker installed:
 
 Then: 
 - follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
+- In your 01_processed_files/conditions_metadata.csv, order your conditoins so that the condition you want to measure regulation against should be at the 
+start of your condition list
 ---------------------------------------------------------------------------------------------------------------------------------------------
   
 **01_raw_files_with_correct_channel_names_keratins_removed_TP_FP_annotated**
