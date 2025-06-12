@@ -1,3 +1,4 @@
+import math
 import pandas as pd
 import numpy as np
 from goatools.cli.ncbi_gene_results_to_python import ncbi_tsv_to_py
@@ -9,6 +10,7 @@ from goatools.anno.genetogo_reader import Gene2GoReader
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.godag_plot import plot_gos, plot_results, plot_goid2goobj
 import matplotlib.pyplot as plt
+import requests
 import matplotlib as mpl
 from matplotlib import cm
 import seaborn as sns
@@ -16,6 +18,8 @@ import textwrap
 from pathlib import Path
 import sys
 import logging
+import subprocess
+import tempfile
 
 def read_in_ncbi_go_associations_data():
     # NCBI Mouse data and GO data was Downloaded on May 17 2023
@@ -61,17 +65,61 @@ def read_in_ncbi_go_associations_data():
     return GeneID2nt_mus, inv_map, file_gene2go
 
 
-def initialize_godag_obj(file_gene2go):
-    # Initialize GODag object
-    obodag = GODag("go-basic.obo")
-    logging.info("Loading Ontologies...")
-    logging.info("go-basic.obo from Gene Ontology Consortium website: %s GO terms", len(obodag))
+def get_map2slim_associations() -> dict:
+    """Map NCBI gene2go associations to the goslim using
+    the map_to_slim script in goatools"""
+    path_to_basic = "go-basic.obo"
+    path_to_slim = "goslim_generic.obo"
+    file_gene2go = "gene2go"
 
     # Read NCBI's gene2go. Store annotations in a list of namedtuples
     objanno = Gene2GoReader(file_gene2go, taxids=[10090])
 
     # Get associations for each branch of the GO DAG (BP, MF, CC)
     ns2assoc = objanno.get_ns2assc()
+    associate_file = "associations"
+    slimmed_associations = {}
+    for domain in ["BP", "MF", "CC"]:
+        # write associations to a temporary file
+        # so we can run map to slim script
+        with tempfile.NamedTemporaryFile(mode="w+", delete=True) as temp_file:
+            lines = []
+            for id in ns2assoc[domain]:
+                vals = ";".join(ns2assoc[domain][id])
+                lines.append(f'"{gene_id}"\t{vals}\n')
+            temp_file.writelines(lines)
+            temp_file.flush()
+            temp_filename = temp_file.name
+
+            mapslim_output = subprocess.run(
+                [
+                    "python",
+                    "map_to_slim.py",
+                    f"--association_file={temp_filename}",
+                    "--slim_out=all",
+                    path_to_basic,
+                    path_to_slim,
+                ],
+                capture_output=True,
+            )
+
+        domain_dict = {}
+        for line in str(mapslim_output.stdout).split("\\n"):
+            # parse map to slim output back to a dictionary
+            if "\\t" in line:
+                parts = str(line).split("\\t")
+                domain_dict[int(parts[0].replace('"', ""))] = set(parts[1].split(";"))
+        slimmed_associations[domain] = domain_dict
+    return slimmed_associations
+
+def initialize_godag_obj(file_gene2go):
+    # Initialize GODag object
+    #obodag = GODag("go-basic.obo")
+    obodag = GODag("goslim_generic.obo")
+    logging.info("Loading Ontologies...")
+    logging.info("go-slim.obo from Gene Ontology Consortium website: %s GO terms", len(obodag))
+
+    ns2assoc = get_map2slim_associations()
 
     logging.info("Loading Associations...")
     for nspc, id2gos in ns2assoc.items():
@@ -156,8 +204,42 @@ def go_it(test_genes, goeaobj, GO_items, inv_map):
     
     return df
 
-#sns.set(font_scale=1.5)
-#sns.set_style("ticks")
+def add_uniprot_function_column(df, accession_col="uniprot_id", batch_size=500):
+    """
+    Adds a 'Function' column to the DataFrame by fetching protein function
+    descriptions from the UniProt REST API for all accessions in accession_col,
+    batching requests to handle large lists.
+    """
+    accessions = df[accession_col].dropna().unique()
+    acc2function = {}
+
+    url = "https://rest.uniprot.org/uniprotkb/search"
+    total = len(accessions)
+    num_batches = math.ceil(total / batch_size)
+
+    for i in range(num_batches):
+        batch = accessions[i * batch_size : (i + 1) * batch_size]
+        query = " OR ".join([f"accession:{acc}" for acc in batch])
+        params = {"query": query, "format": "json", "size": batch_size}
+        response = requests.get(url, params=params)
+        if response.ok:
+            results = response.json().get("results", [])
+            for entry in results:
+                acc = entry.get("primaryAccession", "")
+                function = ""
+                for comment in entry.get("comments", []):
+                    if comment.get("commentType") == "FUNCTION":
+                        function = comment.get("texts", [{}])[0].get("value", "")
+                        break
+                acc2function[acc] = function
+        else:
+            # If the request fails, fill with empty strings for this batch
+            for acc in batch:
+                acc2function[acc] = ""
+
+    # Map the functions back to the DataFrame
+    df["uniprot_function"] = df[accession_col].map(acc2function).fillna("")
+    return df
 
 def create_go_plots(df):
     class_list = list(set(df['class'].tolist()))

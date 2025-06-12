@@ -216,7 +216,7 @@ def normalization_plots(output_folder_path, list_of_file_names, filtered_dict, f
         assert len(norm_df) == len(df)
         assert norm_df.columns.tolist() == df.columns.tolist()
 
-        pca_fig_2 = get_pca_plot(norm_df, "Normalized")
+        pca_fig_2 = get_pca_plot(norm_df, "Normalized") 
         pca_fig_2.write_image(file_folder_path / "pca_norm_data.svg", engine="kaleido")
         plot_list.append(pca_fig_2)
         
@@ -315,7 +315,8 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
             get_heatmap(df, treatment_labelling, volcano_df, file_name, heatmap_folder_path)
             df = add_enrichment_ratio_serum_samples(df, conditions_list, control_labelling, treatment_labelling)
             annotated_protein_df = get_detailed_protein_annotation(df, volcano_df, fasta_table)
-            annotated_protein_df.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
+            final_table = add_uniprot_function_column(annotated_protein_df.reset_index(), accession_col="uniprot_id")
+            final_table.to_csv(serum_file_folder_path / ("final_protein_table_" + file_name.split("processed_census-out_")[1] + ".csv"))
             
             goterm_analysis_folder_path = serum_file_folder_path / 'goterm_analysis'
             if not os.path.exists(goterm_analysis_folder_path):
@@ -392,7 +393,8 @@ def roc_analysis(output_folder_path, list_of_file_names, normalized_dict, file_c
                 volcano_df = get_volcano_plot(conditions_list, control_labelling, treatment_labelling, pass_cutoff_df_norm_data, file_name, volcano_folder_path)
                 pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df)
                 pass_cutoff_true_df = pass_cutoff_true_df.join(volcano_df_trt_vs_ctrl)
-                pass_cutoff_true_df.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
+                final_table = add_uniprot_function_column(pass_cutoff_true_df.reset_index(), accession_col="uniprot_id")
+                final_table.to_csv(tissue_file_folder_path / ("final_protein_table" + file_name.split("processed_census-out")[1] +'.csv'))   
                 
                 heatmap_folder_path = tissue_file_folder_path / 'heatmap_plot'
                 if not os.path.exists(heatmap_folder_path):
