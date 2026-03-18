@@ -6,10 +6,10 @@ Analysis code accompanying the 2026 manuscript
 
 | Folder | Description | Author |
 |---|---|---|
-| `scripts/` | Processing of raw mass spectrometry searches | [Nathalie Ropek](nropek@protonmail.com) |
-| `notebooks/` | Figure generation and post-processing | [Henry Sanford](hsanford@rockefeller.edu) |
-| `templates/` | Examples of formatted metadata for mass spec processing | [Nathalie Ropek](nropek@protonmail.com) |
-| `data/` | Reference datasets for annotating protein secretion | [Nathalie Ropek](nropek@protonmail.com) |
+| `scripts/` | Processing of raw mass spectrometry searches | [Nathalie Ropek](mailto:nropek@protonmail.com) |
+| `notebooks/` | Figure generation and post-processing | [Henry Sanford](mailto:hsanford@rockefeller.edu) |
+| `templates/` | Examples of formatted metadata for mass spec processing | [Nathalie Ropek](mailto:nropek@protonmail.com) |
+| `data/` | Reference datasets for annotating protein secretion | [Nathalie Ropek](mailto:nropek@protonmail.com) |
 
 ## Guide to processing raw mass spectrometry searches
 
