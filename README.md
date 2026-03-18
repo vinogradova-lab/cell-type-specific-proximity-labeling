@@ -1,4 +1,4 @@
-# Cell Type-Specific Proximity Labeling Analysis
+# Cell type-specific proximity labeling analysis
 
 Analysis code accompanying the 2026 manuscript
 
