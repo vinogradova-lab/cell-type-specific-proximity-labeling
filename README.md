@@ -103,16 +103,16 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
 
 1. Calculate Ratios per condition (example of one condition) 
    - Each condition within each file was analyzed on its own, therefore each condition will have its own cutoff in the end. 
-   - Example ratios of file EV1-100A for condition iWAT_HF
-        - ratio_iWAT_HF_cre+_1/iWAT_HF_cre-1
-        - ratio_iWAT_HF_cre+_1/iWAT_HF_cre-_2 	
-        - ratio_iWAT_HF_cre+_2/iWAT_HF_cre-_1 	
-        - ratio_iWAT_HF_cre+_2/iWAT_HF_cre-_2 	
-        - ratio_iWAT_HF_cre+_3/iWAT_HF_cre-_1 	
-        - ratio_iWAT_HF_cre+_3/iWAT_HF_cre-_2 
+   - Example ratios of file CRW_B17A for condition iWAT_HF
+        - ratio_iWAT_HFD_cre+_1/iWAT_HFD_cre-1
+        - ratio_iWAT_HFD_cre+_1/iWAT_HFD_cre-_2 	
+        - ratio_iWAT_HFD_cre+_2/iWAT_HFD_cre-_1 	
+        - ratio_iWAT_HFD_cre+_2/iWAT_HFD_cre-_2 	
+        - ratio_iWAT_HFD_cre+_3/iWAT_HFD_cre-_1 	
+        - ratio_iWAT_HFD_cre+_3/iWAT_HFD_cre-_2 
    - Each replicate will be treated on its own (all steps according to Cho et al - Nature Protocol)
-   - Example: ratio_ iWAT_HF_cre+_1/iWAT_HF_cre-1
-   - Normalize ratio_ iWAT_HF_cre+_1/iWAT_HF_cre-1 by the median ratio of proteins that are labelled as FP
+   - Example: ratio_ iWAT_HFD_cre+_1/iWAT_HFD_cre-1
+   - Normalize ratio_ iWAT_HFD_cre+_1/iWAT_HFD_cre-1 by the median ratio of proteins that are labelled as FP
    - Rank ratios in descending order 
    - For each row in table calculate number of TP and FP in all the rows before
    - Calculate TPR and FPR 
@@ -124,7 +124,7 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
 2. Now that cutoffs for each ratio are identified we merge this information with our original processed raw intensity values file to keep an overview per file and add additional annotation columns from uniprot
    - Sheet “ratio_normSI_annot”:
      - “ratio_” columns: ratios of replicates 
-     - iWAT_HF_cre+_1, iWAT_HF_cre+_2 etc.: normalized signal intensity values
+     - iWAT_HFD_cre+_1, iWAT_HFD_cre+_2 etc.: normalized signal intensity values
      - “pass_cutoff” columns: 1/0  = passed cutoff/did not pass cutoff
      - “median_R” columns: average (median) of ratios for a particular condition (cre+)
      - “median_SI” columns: average (median) of signal intensity for a particular condition (cre+)

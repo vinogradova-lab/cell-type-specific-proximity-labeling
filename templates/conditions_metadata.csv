@@ -1,15 +1,30 @@
-File name,conditions,label_for_controls,label_for_treatment,file_type
-processed_census-out_07142022_EV1-98_16pl_M,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),tissue
-processed_census-out_07232022_EV1-100B_10pl_M,"eWAT_HF, eWAT_chow",cre-,cre+,tissue
-processed_census-out_07252022_EV1-100C_10pl_M,"iWAT_chow, eWAT_chow",cre-,cre+,tissue
-processed_census-out_07302022_EV1-100A_10pl_M,"iWAT_HF, iWAT_chow",cre-,cre+,tissue
-processed_census-out_08032022_EV1-100D_10pl_M,"iWAT_HF, eWAT_HF",cre-,cre+,tissue
-processed_census-out_08072022_EV101_16pl_M,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),tissue
-processed_census-out_08182022_ev1_105_16plex,"alb_turbo, adip_turbo, CD19_turbo",(-),(+),tissue
-processed_census-out_11292022_ev1_136_16plex,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),serum
-processed_census-out_11302022_ev1_137_16plex,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),serum
-processed_census-out_20230214_EV2-9_16pl_M,"HFD_turbo, chow_turbo",(-),(+),serum
-processed_census-out_04172023_CRW_A-5_16pl_M,"BAT, GFAP_brain",Cre(-),Cre(+),tissue
-processed_census-out_04212023_EV2-23_16plex_Mouse_RTS,"HFD, chow",cre(-),cre(+),serum
-processed_census-out_20230512_EV2-28A,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),tissue
-processed_census-out_20230513_EV2-28B,"ctrl_turbo, fast_turbo, LPS_turbo",(-),(+),tissue
+﻿File name,conditions,label_for_controls,label_for_treatment,file_type,time_point
+processed_census-out_20220714_EV1_98,"basal, fast, LPS",cre-,cre+,tissue,
+processed_census-out_20220730_EV1_100A,"iWAT_HFD, iWAT_chow",cre-,cre+,tissue,
+processed_census-out_20220723_EV1_100B,"eWAT_HFD, eWAT_chow",cre-,cre+,tissue,
+processed_census-out_20220725_EV1_100C,"eWAT_chow, iWAT_chow",cre-,cre+,tissue,
+processed_census-out_20220803_EV1_100D,"eWAT_HFD, iWAT_HFD",cre-,cre+,tissue,
+processed_census-out_20220807_EV1_101,"basal, fast, LPS",cre-,cre+,tissue,
+processed_census-out_20220807_EV1_101,"basal, fast, LPS",cre-,cre+,tissue,
+processed_census-out_20220818_EV1_105,"CD19, adip, alb",cre-,cre+,tissue,
+processed_census-out_20221129_EV1_136,"basal, fast, LPS",cre-,cre+,serum,
+processed_census-out_20221130_EV1_137,"basal, fast, LPS",cre-,cre+,serum,
+processed_census-out_20230512_EV2_28A,"basal, fast, LPS",cre-,cre+,tissue,
+processed_census-out_20230513_EV2_28B,"basal, fast, LPS",cre-,cre+,tissue,
+processed_census-out_20230803_EV2_45,"basal, fast, LPS",cre-,cre+,serum,
+processed_census-out_20230830_EV2_47,"basal, fast, LPS",cre-,cre+,serum,
+processed_census-out_20231010_CRW_A18,"HFD, chow",cre-,cre+,serum,
+processed_census-out_20231114_CRW_A26A,"iWAT_HFD, iWAT_chow",cre-,cre+,tissue,
+processed_census-out_20231123_CRW_A26B,"eWAT_HFD, eWAT_chow",cre-,cre+,tissue,
+processed_census-out_20231205_CRW_A26C,"eWAT_chow, iWAT_chow",cre-,cre+,tissue,
+processed_census-out_20231122_CRW_A26D,"eWAT_HFD, iWAT_HFD",cre-,cre+,tissue,
+processed_census-out_20240401_CRW_B13,"HFD, chow",cre-,cre+,serum,6w
+processed_census-out_20240427_CRW_B17A,"iWAT_HFD, iWAT_chow",cre-,cre+,tissue,6w
+processed_census-out_20240429_CRW_B17B,"eWAT_HFD, eWAT_chow",cre-,cre+,tissue,6w
+processed_census-out_20240430_CRW_B17C,"eWAT_chow, iWAT_chow",cre-,cre+,tissue,6w
+processed_census-out_20240501_CRW_B17D,"eWAT_HFD, iWAT_HFD",cre-,cre+,tissue,6w
+processed_census-out_20240907_CRW_B25A,"iWAT_HFD, iWAT_chow",cre-,cre+,tissue,15w
+processed_census-out_20240909_CRW_B25B,"eWAT_HFD, eWAT_chow",cre-,cre+,tissue,15w
+processed_census-out_20240911_CRW_B25C,"eWAT_chow, iWAT_chow",cre-,cre+,tissue,15w
+processed_census-out_20240915_CRW_B25D,"eWAT_HFD, iWAT_HFD",cre-,cre+,tissue,15w
+processed_census-out_20240917_CRW_B30,"HFD, chow",cre-,cre+,serum,15w
