@@ -103,7 +103,7 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
 
 1. Calculate Ratios per condition (example of one condition) 
    - Each condition within each file was analyzed on its own, therefore each condition will have its own cutoff in the end. 
-   - Example ratios of file CRW_B17A for condition iWAT_HF
+   - Example ratios of file CRW_B17A for condition iWAT_HFD
         - ratio_iWAT_HFD_cre+_1/iWAT_HFD_cre-1
         - ratio_iWAT_HFD_cre+_1/iWAT_HFD_cre-_2 	
         - ratio_iWAT_HFD_cre+_2/iWAT_HFD_cre-_1 	
