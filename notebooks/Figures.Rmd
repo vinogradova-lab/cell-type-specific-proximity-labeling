@@ -39,76 +39,6 @@ palette <- c(
 
 # Figure 1
 
-## 1G: GO-term enrichment
-
-```{r, fig.height = 2.2, fig.width=3.3}
-go_term_plot <-
-  function(fn,
-           domains,
-           title,
-           legend_position,
-           height,
-           width,
-           string_wrap) {
-    df <- fn %>%
-      read_csv(show_col_types = FALSE) %>%
-      filter(class %in% domains)
-    df$class <- recode(
-      df$class,
-      "cellular_component" = "Cellular component",
-      "biological_process" = "Biological process",
-      "molecular_function" = "Molecular function"
-    )
-    print(df)
-    df %>%
-      arrange(p_fdr_bh) %>%
-      head(10) %>%
-      ggplot(aes(
-        x = -log10(p_fdr_bh),
-        y = reorder(str_wrap(term, width = string_wrap), -p_fdr_bh),
-        size = n_genes,
-      )) +
-      geom_point(
-        shape = 21,
-        fill = POINT_FILL,
-        stroke = LINE_WIDTH,
-        color = "black"
-      ) +
-      geom_vline(
-        xintercept = -log10(0.05),
-        linetype = "dashed",
-        colour = "grey",
-        size = LINE_WIDTH
-      ) +
-      facet_wrap(~class, scales = "free") +
-      labs(
-        y = NULL,
-        x = expression("-log"[10] * "(FDR)"),
-        size = "proteins"
-      ) +
-      scale_x_continuous(expand = c(0.2, 0.2)) +
-      ggtitle(title) +
-      theme(legend.position = legend_position, legend.key.spacing.y = unit(1, "mm")) +
-      turboid_theme() +
-      scale_size_continuous(range = c(0.5, 3.5)) -> plot
-    print(plot)
-  }
-go_term_plot(
-  fn = "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Mass-spectrometry-datasets/03_results/04_turboid_downstream_results/05_results/01_tissue/20220807_EV1_101/goterm_analysis/full_mouse_genome_background/goterm_full_mouse_genome_basal_cre+vs.cre-_up_go_term_results.csv",
-  domains = c("cellular_component"),
-  title = "Cre+ vs Cre-",
-  legend_position = "right",
-  height = 2.3,
-  width = 3.5,
-  string_wrap = 100
-)
-
-save_plot(
-  "1g_go_term",
-  ht = 2.2,
-  wd = 3.3
-)
-```
 
 ## 1H: Abundance plots
 
@@ -325,7 +255,6 @@ save_plot("s1g_percent_barplot", wd = 2.2, ht = 1.1)
 
 ## S1H: PCA
 
-TODO: pull % explained from files
 
 ```{r, fig.width=2, fig.height=3}
 pca_palette <- c(
@@ -368,6 +297,77 @@ pca_df %>%
   scale_y_continuous(expand = expansion(mult = c(expansion, expansion)))
 
 save_plot("s1h_pca", wd = 2 + 0.05, ht = 3)
+```
+
+## 1G: GO-term enrichment
+
+```{r, fig.height = 2.2, fig.width=3.3}
+go_term_plot <-
+  function(fn,
+           domains,
+           title,
+           legend_position,
+           height,
+           width,
+           string_wrap) {
+    df <- fn %>%
+      read_csv(show_col_types = FALSE) %>%
+      filter(class %in% domains)
+    df$class <- recode(
+      df$class,
+      "cellular_component" = "Cellular component",
+      "biological_process" = "Biological process",
+      "molecular_function" = "Molecular function"
+    )
+    print(df)
+    df %>%
+      arrange(p_fdr_bh) %>%
+      head(10) %>%
+      ggplot(aes(
+        x = -log10(p_fdr_bh),
+        y = reorder(str_wrap(term, width = string_wrap), -p_fdr_bh),
+        size = n_genes,
+      )) +
+      geom_point(
+        shape = 21,
+        fill = POINT_FILL,
+        stroke = LINE_WIDTH,
+        color = "black"
+      ) +
+      geom_vline(
+        xintercept = -log10(0.05),
+        linetype = "dashed",
+        colour = "grey",
+        size = LINE_WIDTH
+      ) +
+      facet_wrap(~class, scales = "free") +
+      labs(
+        y = NULL,
+        x = expression("-log"[10] * "(FDR)"),
+        size = "proteins"
+      ) +
+      scale_x_continuous(expand = c(0.2, 0.2)) +
+      ggtitle(title) +
+      theme(legend.position = legend_position, legend.key.spacing.y = unit(1, "mm")) +
+      turboid_theme() +
+      scale_size_continuous(range = c(0.5, 3.5)) -> plot
+    print(plot)
+  }
+go_term_plot(
+  fn = "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Mass-spectrometry-datasets/03_results/04_turboid_downstream_results/05_results/01_tissue/20220807_EV1_101/goterm_analysis/full_mouse_genome_background/goterm_full_mouse_genome_basal_cre+vs.cre-_up_go_term_results.csv",
+  domains = c("cellular_component"),
+  title = "Cre+ vs Cre-",
+  legend_position = "right",
+  height = 2.3,
+  width = 3.5,
+  string_wrap = 100
+)
+
+save_plot(
+  "1g_go_term",
+  ht = 2.2,
+  wd = 3.3
+)
 ```
 
 ## S1I-J: Signal P volcano plot
@@ -1077,18 +1077,13 @@ correlation_plot <-
     }
 
     log_threshold <- -log10(0.05)
-    
-    #print("Combined DF")
-    #print(colnames(combined_df))
+
 
     wide_df <- combined_df %>%
       pivot_wider(
         names_from = time_point,
         values_from = c(log2_FC, log10_pval)
       )
-    #print("Wide DF")
-    #print(colnames(wide_df))
-    #return(wide_df)
 
     
     combined_df <- wide_df %>%
@@ -2209,17 +2204,6 @@ upset(
   sort_sets = FALSE,
   intersect = names(sets),
   set_sizes = FALSE, # (
-  #        upset_set_size(
-  #           geom=geom_bar(
-  #                aes(fill=Outcyte, x=group),
-  #                width=0.6,
-  #                color = "black",
-  #                size = LINE_WIDTH,
-  #                show.legend = FALSE
-  #            ),
-  #            position='right'
-  #        )+ scale_fill_manual(values = palette) + scale_y_continuous(breaks = c(0,1500))
-  #    ),
   matrix = (intersection_matrix(
     geom = geom_point(
       size = 1
@@ -2768,9 +2752,6 @@ dep_path %>%
   filter(uniprot_id == "O88495")
 ```
 
-```{r}
-df %>% filter(gene_name == "Gpr50")
-```
 
 # Figure 5
 
@@ -4763,333 +4744,3 @@ df <- fold_change_dot_plot(
 ```
 
 
-
-
-# Figure S7
-
-
-
-```{r}
-library(forestploter)
-forest_plot <- function(protein, disease_chapter){
-
-ukbb_df <- '/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/UKBB_plasma_proteome_atlas/ukbb_turboid_intersect_significant_associations_only.csv' %>%
-  read_csv(show_col_types = FALSE)%>%
-  filter(
-    disease_type == "prevalent",
-    Protein == protein,
-    Disease_category == disease_chapter) %>%
-  select(
-    Protein, Disease_category, Disease, NB_individual, NB_case, P_value, `OR[95%CI]`
-  ) %>%
-  mutate(
-    `Disease (n individuals, n cases)` =  paste0(Disease, " (", format(NB_individual, big.mark = ","), " / ", format(NB_case, big.mark = ","), ")"),
-    or = `OR[95%CI]` %>% str_split(" ") %>% map_chr(1) %>% as.numeric(),
-    or_low = `OR[95%CI]` %>% str_split("\\[") %>% map_chr(2) %>% str_split("-") %>% map_chr(1) %>% as.numeric(),
-    or_hi = `OR[95%CI]` %>% str_split("-") %>% map_chr(2) %>% str_split("\\]") %>% map_chr(1) %>% as.numeric(),
-    `P value` = sprintf("%.2e", P_value)
-    ) %>%
-  select(
-    `Disease (n individuals, n cases)`,
-    or_low,
-    or, 
-    or_hi,
-    `P value`
-  )
-if(nrow(ukbb_df) == 0){
-  return()
-}
-
-tm <- forest_theme(
-  base_size = 6,
-  base_family = "Arial",
-  title_gp = gpar(fontsize = 6, family = "Arial")
-  #core = list(fg_params = list(hjust = 1, x = 0.9))
-)
-
-ukbb_df$` ` <- paste(rep("     ", length(ukbb_df)), collapse = " ")
-p <- forest(
-  data = ukbb_df %>% select(`Disease (n individuals, n cases)`, " ",`P value`),
-  est = ukbb_df$or,
-  lower = ukbb_df$or_low,
-  upper = ukbb_df$or_hi,
-  ticks_at = seq(min(-1, round(min(ukbb_df$or_low))), round(max(ukbb_df$or_hi)), by = 1),
-  ref_line = 1,
-  ci_column = 2,
- arrow_lab = c("Lower Prevalence", "Higher Prevalence"),
- theme = tm,
- title = paste(protein, gsub("Chapter [IVX]+ ", "", disease_chapter)),
-
-)
-
-p_wh <- get_wh(plot = p, unit = "in")
-fn <- paste(protein, gsub("Chapter [IVX]+ ", "", disease_chapter))
-pdf(paste0('/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Data visualization/03_plots/0_forest_plots/', fn, ".pdf"), width = p_wh[1], height = p_wh[2])
-print(p)
-dev.off()
-print(p)
-}
-
-for (target in c("LIFR","C7","SERPINF1", "SNCG", "LRG1","APOA4", "BCHE")){
-  for (disease_chapter in disease_chapters){
-    print(disease_chapter)
-    forest_plot(target, disease_chapter)
-  }
-}
-
-ukbb_df
-```
-
-
-# Cross-referencing
-
-c) Line 297. The authors report significant diet-specific regulation of iWAT and eWAT proteins. How does this compare with data from previous studies examining the same question using other mass spectrometry proteomics based approaches?
-
-```{r}
-turboid_de <- '/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Supplementary Data/Supplementary Data_for review/Data S3.xlsx' |> 
-  read_xlsx(skip = 2)
-harney_de <- "reference_data/previous_studies/Harney_S1.xlsx" |> 
-  read_xlsx(skip = 1)
-
-```
-
-
-https://www.sciencedirect.com/science/article/pii/S2211124721001182#mmc2
-
-
-```{r}
-joined <- turboid_de |> 
-  mutate(Gene.names = Symbol_mouse_jackson_homology_db) |> 
-  filter(!is.na(Gene.names)) |> 
-  left_join(y = harney_de, by = "Gene.names") |> 
-  arrange(by = entry_name)
-
-# renaming columns because original column names are insane
-x_lfc_name <- "Adiponectin_Tissue_log2_FC_fast vs. basal_20220807_EV1_101"
-y_lfc_name <- "vWAT\r\n(Fasted/Fed), Adlib\r\nLog2 Fold change"
-x_pval_name <- "Adiponectin_Tissue_neg_log10_pval_fast vs. basal_20220807_EV1_101"
-y_pval_name <- "scWAT\r\nDiet\r\n-Log10(P) BH" 
-
-x_lab <- expression("iWAT, log"[2]*"(fast vs basal)")
-y_lab <- expression("scWAT Adlib, log"[2]*"(Fasted/Fed")
-
-wide_df <- joined |> 
-  rename(log2_FC_x = all_of(x_lfc_name),
-         log2_FC_y = all_of(y_lfc_name),
-         log10_pval_x = all_of(x_pval_name),
-         log10_pval_y = all_of(y_pval_name)) |>
-  select(
-    Gene.names, 
-    log2_FC_x, log2_FC_y, log10_pval_x, log10_pval_y) |> 
-    mutate(across(c(log2_FC_x, log2_FC_y, log10_pval_x, log10_pval_y), ~as.numeric(na_if(.x, "NA")))) |> 
-  filter(!(is.na(log2_FC_x) & is.na(log2_FC_y))) 
-
-correlation_plot(wide_df |> mutate(), x_lab, y_lab, correlation_palette = c_palette, min = -5, max = 4)
-
-ggsave(paste0("Chow vs Basal, iWAT and SC tissue", ".pdf"), width =2, height = 4)
-ggsave(paste0("Chow vs Basal, iWAT and SC tissue", ".png"), width =2, height = 4)
-
-
-
-```
-
-```{r, fig.width=2, fig.height=3}
-
-
-correlation_plot <- function(wide_df, x_lab, y_lab, min = -8, max = 7, correlation_palette = c()){
-num_top <- 7
-log_threshold <- -log10(0.05)
-top = c()
-margin_factor <- 0.85
-margin_position <- min * margin_factor
-missing_point_value <- (min + margin_position) / 2
-
-combined_df <- wide_df %>%
-      mutate(
-        alias = Gene.names,
-        significance = case_when(
-          (log10_pval_x > log_threshold) &
-            (log10_pval_y > log_threshold) ~ names(correlation_palette[4])[1],
-          (log10_pval_y > log_threshold) ~ names(correlation_palette[2])[1],
-          (log10_pval_x > log_threshold) ~ names(correlation_palette[1])[1],
-          TRUE ~ names(correlation_palette[3])[1]
-        )
-      ) %>%
-      mutate(
-        #significance = factor(significance, levels = names(correlation_palette)),
-        dist_from_orig = sqrt(log2_FC_x^2 + log2_FC_y^2),
-        distance_from_identity = abs(log2_FC_x - log2_FC_y)
-      ) 
-
-    # calculate pearson's correlation from complete cases
-    pearson_r <- cor(combined_df$log2_FC_x, combined_df$log2_FC_y, use = "complete.obs") %>%
-      round(digits = 2)
-
-
-    print(max(combined_df$log2_FC_x, na.rm = TRUE))
-    print(max(combined_df$log2_FC_y, na.rm = TRUE))
-    print(min(combined_df$log2_FC_x, na.rm = TRUE))
-    print(min(combined_df$log2_FC_y, na.rm = TRUE))
-
-    combined_df <- combined_df %>%
-      # replace missing values with values on the margins
-      replace_na(list(log2_FC_x = missing_point_value, log2_FC_y = missing_point_value))
-
-    # pull list of proteins to give text labels
-    significant_no_missing <- combined_df %>%
-      filter(
-        significance != "Not significant",
-        log2_FC_x != missing_point_value,
-        log2_FC_y != missing_point_value
-      )
-    label_data <- rbind(
-      # top by distance from identity
-      significant_no_missing %>%
-        arrange(distance_from_identity) %>%
-        tail(num_top),
-      # top by distance from origin
-      significant_no_missing %>%
-        arrange(dist_from_orig) %>%
-        tail(num_top),
-      # top only quantified at x
-      combined_df %>%
-        arrange(abs(log2_FC_x)) %>%
-        filter(
-          significance != "Not significant",
-          (log2_FC_y == missing_point_value)
-        ) %>%
-        tail(num_top / 2),
-      # top only quantified at y
-      combined_df %>%
-        arrange(abs(log2_FC_y)) %>%
-        filter(
-          significance != "Not significant",
-          (log2_FC_x == missing_point_value)
-        ) %>%
-        tail(num_top / 2)
-    ) %>% distinct()
-    
-    if (length(top) > 0){
-      label_data <- combined_df %>% filter(significance != "Not significant", alias %in% top)
-    }
-    
-    print(top[!top %in% unique(label_data$alias)])
-    print("CAVIN2" %in% combined_df$alias)
-    print("SDPR" %in% combined_df$alias)
-
-    plot <- combined_df %>%
-      # sort so labeled points are stacked on top
-      mutate(z_order = alias %in% unique(label_data$alias)) %>%
-      arrange(z_order) %>%
-      ggplot(aes(
-        x = log2_FC_x,
-        y = log2_FC_y,
-        fill = significance,
-        label = alias
-      )) +
-      # margin lines
-      geom_hline(
-        yintercept = margin_position,
-        size = LINE_WIDTH,
-        color = "black"
-      ) +
-      geom_vline(
-        xintercept = margin_position,
-        size = LINE_WIDTH,
-        color = "black"
-      ) +
-      # origin lines
-      geom_hline(
-        yintercept = 0,
-        color = "grey90",
-        size = LINE_WIDTH
-      ) +
-      geom_vline(
-        xintercept = 0,
-        color = "grey90",
-        size = LINE_WIDTH
-      ) +
-      # diagonal boundary lines
-      geom_segment(
-        data = data.frame(),
-        aes(
-          x = c(margin_position, margin_position, margin_position + 1),
-          y = c(margin_position + 1, margin_position, margin_position),
-          xend = c(max - 1, max, max),
-          yend = c(max, max, max - 1),
-          linetype = c("dashed", "solid", "dashed")
-        ),
-        size = LINE_WIDTH,
-        inherit.aes = FALSE,
-        show.legend = FALSE,
-        color = "black"
-      ) +
-      # scatterplot
-      geom_point(
-        shape = 21,
-        stroke = 0,
-        alpha = 0.55,
-        size = 1.4,
-      ) +
-      # protein labels
-      geom_text_repel(
-        data = label_data,
-        size = 1.94028,
-        family = FONT_FAMILY,
-        min.segment.length = 0,
-        #force = 3,
-        segment.size = LINE_WIDTH,
-        max.overlaps = Inf,
-        #nudge_y = -2,
-        #nudge_x = 2,
-        show.legend = FALSE#,
-        #segment.curvature = -0.1,
-      #segment.ncp = 3,
-      #segment.angle = 45
-      ) +
-      turboid_theme() +
-      theme(
-        aspect.ratio = 1,
-        # 20 lines of legend formatting
-        legend.position = "top",
-        legend.text = element_text(
-          size = 6,
-          color = "black",
-          family = "Arial",
-          margin = margin(l = 0)
-        ),
-        legend.box.background = element_blank(),
-        legend.justification.top = "top",
-        legend.justification = "center",
-        legend.box.just = "center",
-        legend.key = element_blank(),
-        legend.margin = margin(l = -5, b = -5.5),
-        legend.box.margin = margin(l = -5, b = -0.8),
-        legend.key.spacing.y = unit(-0.9, "cm"),
-        legend.key.spacing.x = unit(-0.1, "cm")
-      ) +
-      guides(fill = guide_legend(nrow = 2, override.aes = list(alpha = 1))) +
-      labs(
-        x = x_lab,
-        y = y_lab
-      ) +
-      scale_fill_manual(values = correlation_palette, name = NULL) +
-      scale_x_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
-      scale_y_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
-      scale_linetype_manual(values = c("dashed" = "dashed", "solid" = "solid")) +
-      geom_text(
-        mapping = aes(
-          x = min * 0.6,
-          y = max * 0.85,
-        ),
-        label = paste("R = ", as.character(pearson_r)),
-        inherit.aes = FALSE,
-        data = data.frame(),
-        size = 1.94028,
-        family = FONT_FAMILY
-      )
-
-    print(plot)
-    return(plot)
-}
-```
