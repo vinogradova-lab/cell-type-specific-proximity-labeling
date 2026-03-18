@@ -1,0 +1,5095 @@
+---
+editor_options:
+  markdown:
+    wrap: 72
+output:
+  html_document:
+    df_print: paged
+---
+
+# TurboID figures
+
+Henry Sanford
+[hsanford\@rockefeller.edu](mailto:hsanford@rockefeller.edu){.email}
+
+```{r}
+source("utils_turboid.R")
+
+
+dep_path <- paste0(PIPELINE_RESULTS_PATH, "turboid_differential_expression.csv")
+
+go_path <- paste0(PIPELINE_RESULTS_PATH, "turboid_go_term_analysis.csv")
+
+
+replace_list <- c(
+  "Intracellular" = "Intracellular",
+  "Signal_Peptide" = "Signal Peptide",
+  "Transmembrane" = "Transmembrane",
+  "UPS" = "UPS",
+  "NA" = "Other"
+)
+palette <- c(
+  "Signal Peptide" = "#721f81",
+  "Intracellular" = "#b73779",
+  "UPS" = "#f1605d",
+  "Transmembrane" = "#feb078",
+  "Other" = "lightgrey"
+)
+```
+
+# Figure 1
+
+## 1G: GO-term enrichment
+
+```{r, fig.height = 2.2, fig.width=3.3}
+go_term_plot <-
+  function(fn,
+           domains,
+           title,
+           legend_position,
+           height,
+           width,
+           string_wrap) {
+    df <- fn %>%
+      read_csv(show_col_types = FALSE) %>%
+      filter(class %in% domains)
+    df$class <- recode(
+      df$class,
+      "cellular_component" = "Cellular component",
+      "biological_process" = "Biological process",
+      "molecular_function" = "Molecular function"
+    )
+    print(df)
+    df %>%
+      arrange(p_fdr_bh) %>%
+      head(10) %>%
+      ggplot(aes(
+        x = -log10(p_fdr_bh),
+        y = reorder(str_wrap(term, width = string_wrap), -p_fdr_bh),
+        size = n_genes,
+      )) +
+      geom_point(
+        shape = 21,
+        fill = POINT_FILL,
+        stroke = LINE_WIDTH,
+        color = "black"
+      ) +
+      geom_vline(
+        xintercept = -log10(0.05),
+        linetype = "dashed",
+        colour = "grey",
+        size = LINE_WIDTH
+      ) +
+      facet_wrap(~class, scales = "free") +
+      labs(
+        y = NULL,
+        x = expression("-log"[10] * "(FDR)"),
+        size = "proteins"
+      ) +
+      scale_x_continuous(expand = c(0.2, 0.2)) +
+      ggtitle(title) +
+      theme(legend.position = legend_position, legend.key.spacing.y = unit(1, "mm")) +
+      turboid_theme() +
+      scale_size_continuous(range = c(0.5, 3.5)) -> plot
+    print(plot)
+  }
+go_term_plot(
+  fn = "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Mass-spectrometry-datasets/03_results/04_turboid_downstream_results/05_results/01_tissue/20220807_EV1_101/goterm_analysis/full_mouse_genome_background/goterm_full_mouse_genome_basal_cre+vs.cre-_up_go_term_results.csv",
+  domains = c("cellular_component"),
+  title = "Cre+ vs Cre-",
+  legend_position = "right",
+  height = 2.3,
+  width = 3.5,
+  string_wrap = 100
+)
+
+save_plot(
+  "1g_go_term",
+  ht = 2.2,
+  wd = 3.3
+)
+```
+
+## 1H: Abundance plots
+
+Pull tissue enriched and tissue enhanced genes from human protein atlas
+
+-   Cell type enriched: At least four-fold higher mRNA level in a
+    particular tissue/cell type compared to any other tissues/cell
+    types.
+-   Group enriched: At least four-fold higher average mRNA level in a
+    group of 2-5 tissues or 2-10 cell types compared to any other
+    tissues/cell types.
+-   Cell type enhanced: At least four-fold higher mRNA level in a
+    particular tissue/cell type compared to the average level in all
+    other tissues/cell types.
+
+```{r, fig.width=8, fig.height=2.3}
+hpa_data_three_tissues <- NULL
+tissues_to_download <- c("Adipocytes" = "adip", "Hepatocytes" = "alb", "B-cells" = "CD19")
+for (tissue in names(tissues_to_download)) {
+  for (category in c("Cell+type+enhanced", "Cell+type+enriched", "Group+enriched")) {
+    url <- paste0(
+      "https://www.proteinatlas.org/search/cell_type_category_rna%3A",
+      tissue,
+      "%3B",
+      category,
+      "+AND+sort_by%3Atissue+specific+score?format=tsv"
+    )
+    hpa_data_three_tissues <- GET(url) %>%
+      content(as = "text") %>%
+      read_delim(show_col_types = FALSE) %>%
+      mutate(
+        tissue = tissues_to_download[tissue],
+        hpa_category = gsub("\\+", " ", category)
+      ) %>%
+      rbind(hpa_data_three_tissues)
+
+    Sys.sleep(0.1)
+  }
+}
+
+hpa_data <- hpa_data_three_tissues %>%
+  mutate(synonyms = paste0(Gene, ", ", `Gene synonym`)) %>%
+  separate_rows(synonyms, sep = ", ") %>%
+  filter(synonyms != "NA") %>%
+  mutate(key = paste(synonyms, tissue)) %>%
+  dplyr::select(synonyms, tissue, key, hpa_category, `RNA single cell type specificity`, `RNA single cell type specific nCPM`)
+
+### Make abundance plot
+
+proteins_to_highlight <- c("TLR9_CD19", "MZB1_CD19", "IGJ_CD19", "IGHM_CD19", "CR2_CD19", "ITGAL_CD19", "ITGB2_CD19", "TRFE_alb", "MBL2_alb", "KNG1_alb", "ITIH1_alb", "HPT_alb", "HEMO_alb", "C3_alb", "APOH_alb", "APOB_alb", "RETN_adip", "PLIN4_adip", "PLIN1_adip", "NEGR1_adip", "LRG1_adip", "LPL_adip", "FABP4_adip", "DERM_adip", "APOE_adip", "ADIPO_adip", "PLIN4_adip", "FABP4_adip", "SPRC_adip", "GSYN_adip", "SPRC_adip", "LPL_adip", "CPN2_adip", "CD74_CD19", "COFA1_adip", "MA2B1_CD19", "LIFR_adip", "IRAG2_CD19", "IRF8_CD19", "MOT8_alb", "TINAL_adip")
+
+tissue_abundance_data <-
+  read_experiment("20220818_EV1_105", "tissue") %>%
+  add_alias() %>%
+  # calculate mean signal intensity
+  dplyr::select(c(alias, uniprot_id, Symbol_human_jackson_homology_db, `SWISS_PROT IDs_human_jackson_homology_db`) | contains("cre+")) %>%
+  dplyr::select(-contains("cre-")) %>%
+  pivot_longer(cols = -c(uniprot_id, alias, Symbol_human_jackson_homology_db, `SWISS_PROT IDs_human_jackson_homology_db`)) %>%
+  mutate(tissue = str_split(name, "_") %>% map_chr(1)) %>%
+  group_by(uniprot_id, alias, tissue, Symbol_human_jackson_homology_db, `SWISS_PROT IDs_human_jackson_homology_db`) %>%
+  summarise(log2_mean_SI = log2(mean(value))) %>%
+  group_by(tissue) %>%
+  # add metadata for plotting
+  mutate(
+    # add signal intensity rank
+    rank = order(order(log2_mean_SI, decreasing = TRUE)),
+    # add tissue name for plotting
+    tissue_name = recode(
+      tissue,
+      "alb" = "Albumin-Cre liver",
+      "adip" = "Adiponectin-Cre iWAT",
+      "CD19" = "CD19-Cre spleen"
+    ),
+    # convert tissue name to factor for plot order
+    tissue_name = factor(
+      tissue_name,
+      levels = c("Albumin-Cre liver", "Adiponectin-Cre iWAT", "CD19-Cre spleen")
+    ),
+    human_gn = str_split(`Symbol_human_jackson_homology_db`, ",") %>% map_chr(1),
+    key = paste(human_gn, tissue),
+    highlight = tolower(key) %in% tolower(hpa_data$key),
+    label = (paste0(alias, "_", tissue) %in% proteins_to_highlight) & (highlight),
+    label_name = case_when(label ~ alias, TRUE ~ "")
+  )
+
+tissue_abundance_data %>%
+  arrange(label, highlight) %>%
+  ggplot(aes(x = rank, y = log2_mean_SI, label = label_name, fill = highlight, stroke = label, alpha = label)) +
+  geom_point(
+    shape = 21,
+    show.legend = FALSE
+  ) +
+  geom_text_repel(
+    size = 2.11667,
+    family = FONT_FAMILY,
+    segment.size = LINE_WIDTH,
+    min.segment.length = 0,
+    max.overlaps = Inf,
+    show.legend = FALSE
+  ) +
+  facet_wrap(~tissue_name, scales = "free") +
+  labs(
+    x = "protein rank",
+    y = expression("log"[2] * "(mean signal intensity)")
+  ) +
+  turboid_theme() +
+  theme(aspect.ratio = 1, strip.text.x.top = element_text(family = FONT_FAMILY, size = 8, color = "black"), panel.spacing.x = unit(0.4, "cm")) +
+  scale_fill_manual(
+    values = c(
+      "TRUE" = POINT_FILL,
+      "FALSE" = "grey90"
+    )
+  ) +
+  scale_discrete_manual(aesthetics = "stroke", values = c("TRUE" = LINE_WIDTH, "FALSE" = 0)) +
+  scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.5))
+
+hpa_data %>%
+  write_csv(paste0(PIPELINE_RESULTS_PATH, "hpa_data_three_tissues.csv"))
+
+save_plot("1h_abundance_plot", wd = 8, ht = 2.5)
+```
+
+## S1G: Percent barplot
+
+```{r, fig.height=1.1, fig.width=2.2}
+percent_barplot_theme <- function(ggplot_obj) {
+  # theme to be applied to stacked barplots throughout
+  # manuscript
+  ggplot_obj +
+    scale_x_continuous(
+      labels = scales::percent_format(accuracy = 1, suffix = ""),
+      breaks = c(0, 0.5, 1),
+      expand = expansion(mult = c(0, 0))
+    ) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    labs(fill = NULL) +
+    # percent axis labels
+    labs(x = NULL, y = NULL) +
+    ggtitle("% of proteins") +
+    turboid_theme() +
+    # no border line
+    theme(
+      panel.border = element_blank(),
+      axis.line.x = AXIS_LINE,
+      axis.line.y = AXIS_LINE,
+    ) +
+    theme(
+      legend.key.size = unit(2, "mm"),
+      legend.key.spacing.y = unit(0.75, "mm"),
+      legend.position = "right",
+      legend.justification = "center",
+      legend.margin = margin(0, 0, 0, -5),
+      plot.title = element_text(
+        family = FONT_FAMILY,
+        color = "black",
+        size = FONT_SIZE,
+        margin = margin(0, 0, 1, 0)
+      ),
+      legend.text = element_text(
+        family = FONT_FAMILY,
+        size = FONT_SIZE,
+        color = "black",
+        margin = margin(l = 1)
+      )
+    )
+}
+df <-
+  "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Mass-spectrometry-datasets/03_results/04_turboid_downstream_results/05_results/01_tissue/20220818_EV1_105/01_cutoff_ROC_filter/decision_table_20220818_EV1_105.xlsx" %>%
+  readxl::read_excel() %>%
+  rename(pass_cutoff_variable = "pass_cutoff_result") %>%
+  dplyr::select(pass_cutoff_variable, "annotation")
+
+# generate labels that include protein counts
+not_pass_label <-
+  paste0("not pass cutoff\n(", nrow(df %>% filter(pass_cutoff_variable == 0)), " proteins)")
+pass_label <-
+  paste0("pass cutoff\n(", nrow(df %>% filter(pass_cutoff_variable == 1)), " proteins)")
+all_label <- paste0("all\n(", nrow(df), " proteins)")
+
+all_proteins <- df %>% mutate(pass_cutoff = all_label)
+
+replace_list <-
+  c("TP" = "True positive", "FP" = "False positive", "NA" = "Not annotated")
+palette <- c(
+  "Not annotated" = "#9B75A4",
+  "False positive" = "#999CC1",
+  "True positive" = "#8DB8C3"
+)
+obj <- df %>%
+  mutate(pass_cutoff = case_when(
+    pass_cutoff_variable == 1 ~ pass_label,
+    TRUE ~ not_pass_label
+  )) %>%
+  rbind(all_proteins) %>%
+  mutate(
+    annotation = replace_na(annotation, replace = "NA"),
+    annotation = recode(annotation, !!!replace_list),
+    pass_cutoff = factor(pass_cutoff, levels = c(not_pass_label, pass_label, all_label)),
+    annotation = factor(annotation, levels = names(palette))
+  ) %>%
+  ggplot(mapping = aes(y = pass_cutoff, fill = annotation)) +
+  geom_bar(
+    position = "fill",
+    color = "black",
+    size = LINE_WIDTH,
+    width = 0.65
+  ) +
+  scale_fill_manual(values = palette)
+
+percent_barplot_theme(obj)
+
+save_plot("s1g_percent_barplot", wd = 2.2, ht = 1.1)
+```
+
+## S1H: PCA
+
+TODO: pull % explained from files
+
+```{r, fig.width=2, fig.height=3}
+pca_palette <- c(
+  "CD19-Cre+" = "#B5D336",
+  "Albumin-Cre+" = "#26838F",
+  "Adipo-Cre+" = "#AEB4DB"
+)
+"/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Data visualization/01_source_data/tissue/pca/20220818_EV1_105_normalized_pca.csv" %>%
+  read_csv(show_col_types = FALSE) -> pca_df
+# remap condition values
+map <-
+  setNames(
+    c("Adipo-Cre+", "Albumin-Cre+", "CD19-Cre+"),
+    c("alb_cre+", "adip_cre+", "CD19_cre+")
+  )
+pca_df$condition <- map[unlist(pca_df$condition)]
+expansion <- 0.25
+pca_df %>%
+  mutate(condition = factor(condition, levels = names(pca_palette))) %>%
+  ggplot(aes(
+    x = `principal component 1`, y = `principal component 2`, fill =
+      condition
+  )) +
+  geom_point(
+    size = 2.5,
+    shape = 21,
+    alpha = 0.9,
+    col = "black",
+    stroke = LINE_WIDTH,
+    show.legend = TRUE
+  ) +
+  turboid_theme() +
+  labs(x = "PC1 (56.83%)", y = "PC2 (33.88%)") +
+  legend_theme() +
+  scale_fill_manual(
+    values = pca_palette,
+    name = NULL
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(expansion, expansion))) +
+  scale_y_continuous(expand = expansion(mult = c(expansion, expansion)))
+
+save_plot("s1h_pca", wd = 2 + 0.05, ht = 3)
+```
+
+## S1I-J: Signal P volcano plot
+
+```{r, fig.width=2, fig.height=4}
+volcano_plot_base <-
+  function(df,
+           params,
+           left_annotation,
+           right_annotation) {
+    annotations <- data.frame(
+      xpos = c(-Inf, Inf),
+      ypos = c(Inf, Inf),
+      annotateText = c(left_annotation, right_annotation),
+      hjustvar = c(-0.1, 1.1)
+    )
+    df %>%
+      arrange(group) %>%
+      ggplot(aes(x = log2FC, y = `-log10_pval`, fill = group, alpha = group)) +
+      geom_point(
+        shape = 21,
+        stroke = params$stroke,
+        size = 1.2,
+        show.legend = params$show_legend
+      ) +
+      legend_theme() +
+      # make x axis a bit wider
+      # scale_x_continuous(expand = expansion(mult = c(.05, .05))) +
+      scale_fill_manual(values = params$palette) +
+      scale_alpha_manual(values = params$alpha_palette, guide = "none") +
+      labs(
+        y = expression("-log"[10] * "(p-value)"),
+        fill = NULL
+      ) +
+      geom_hline(
+        yintercept = -log10(0.05),
+        linetype = "dashed",
+        size = LINE_WIDTH
+      ) +
+      geom_vline(
+        xintercept = c(-LFC_CUTOFF, LFC_CUTOFF),
+        linetype = "dashed",
+        size = LINE_WIDTH
+      ) +
+      geom_text(
+        data = annotations,
+        aes(
+          x = xpos,
+          y = ypos,
+          # hjust = hjustvar,
+          label = annotateText,
+        ),
+        vjust = 1.25,
+        hjust = "inward",
+        nudge_x = 4,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        size = FONT_SIZE_MM,
+        fontface = "italic",
+        lineheight = 0.95
+      )
+  }
+
+cre_volcano_plot <- function(df, cre_palette) {
+  # pull top n proteins to label
+  df %>%
+    filter(group != "Other") %>%
+    arrange(`-log10_pval`) %>%
+    tail(10) -> lbl_df
+
+  df %>%
+    volcano_plot_base(
+      params = list(palette = cre_palette, stroke = 0, show_legend = TRUE, alpha_palette = setNames(rep(0.6, length(signal_p_palette)), names(cre_palette))),
+      left_annotation = " Elevated in\n Cre-",
+      right_annotation = "Elevated in \nCre+ "
+    ) +
+    annotate(
+      geom = "rect",
+      xmin = log2(1.5),
+      xmax = Inf,
+      ymin = -log10(0.05),
+      ymax = Inf,
+      fill = "#FDE725FF",
+      alpha = 0.5,
+    ) +
+    labs(x = expression("log"[2] * "(Adipo-Cre+/Adipo-Cre-)"))
+}
+
+read_experiment("20220818_EV1_105", "tissue") %>%
+  rename(c(
+    log2FC = "log2_FC_processed_census-out_20220818_EV1_105 - adip_cre+vs.cre- (2247 Proteins)",
+    `-log10_pval` = "-log10_pval_processed_census-out_20220818_EV1_105 - adip_cre+vs.cre- (2247 Proteins)",
+    `gene` = "gene_name"
+  )) %>%
+  dplyr::select(
+    `Entry Name`,
+    gene,
+    log2FC,
+    `-log10_pval`,
+    `Signal peptide`,
+    `Gene Ontology (cellular component)`
+  ) %>%
+  add_alias() -> df
+
+# signal peptide volcano plot
+signal_p_palette <-
+  c(
+    "Other" = "grey",
+    "Signal peptide" = "cornflowerblue"
+  )
+df %>%
+  mutate(
+    group = case_when(is.na(`Signal peptide`) ~ "Other", TRUE ~ "Signal peptide"),
+    group = factor(group, levels = names(signal_p_palette))
+  ) %>%
+  cre_volcano_plot(cre_palette = signal_p_palette)
+
+save_plot("s1i_er_volcano", ht = 4, wd = 2)
+
+# er protein volcano plot
+er_palette <-
+  c(
+    "Other" = "grey",
+    "Endoplasmic reticulum" = "hotpink4"
+  )
+df %>%
+  mutate(
+    group = case_when(
+      str_detect(`Gene Ontology (cellular component)`, "GO:0005783") ~ "Endoplasmic reticulum",
+      TRUE ~ "Other"
+    ),
+    group = factor(group, levels = names(er_palette))
+  ) %>%
+  cre_volcano_plot(cre_palette = er_palette)
+
+save_plot("s1j_er_volcano", ht = 4, wd = 2)
+```
+
+## S2J summary barplot
+
+```{r, fig.width=2.4, fig.height=2}
+df <- dep_path %>%
+  read_csv(show_col_types = FALSE) %>%
+  filter(
+    experiment == "20220818_EV1_105",
+    grepl("cre", comparison) & !grepl("conditions", comparison),
+    Regulation == "Significant Up"
+  )
+
+
+sp_df <- df %>%
+  mutate(
+    column = "Signal peptide",
+    group = case_when(
+      Outcyte == "Signal_Peptide" ~ "Signal peptide",
+      TRUE ~ "Other"
+    )
+  )
+
+er_df <- df %>%
+  mutate(
+    column = "Endoplasmic reticulum",
+    group = case_when(
+      str_detect(`Gene Ontology (GO)`, "GO:0005783") ~ "Endoplasmic reticulum",
+      TRUE ~ "Other"
+    ),
+  )
+
+obj <- rbind(
+  sp_df,
+  er_df
+) %>%
+  mutate(
+    comparison = case_when(
+      grepl("adip", comparison) ~ "Adipo-Cre",
+      grepl("alb", comparison) ~ "Albumin-Cre",
+      TRUE ~ "CD19-Cre"
+    ),
+    comparison = factor(comparison, levels = c("Albumin-Cre", "Adipo-Cre", "CD19-Cre")),
+    group = factor(group, levels = c("Other", "Endoplasmic reticulum", "Signal peptide")),
+    column = factor(column, levels = rev(c("Other", "Endoplasmic reticulum", "Signal peptide")))
+  ) %>%
+  ggplot(
+    aes(y = comparison, fill = group)
+  ) +
+  geom_bar(position = "fill", show.legend = TRUE, color = "black", size = LINE_WIDTH, width = 0.65) +
+  facet_rep_grid(rows = vars(column), repeat.tick.labels = TRUE) +
+  scale_fill_manual(values = c(
+    "Signal peptide" = "cornflowerblue",
+    "Endoplasmic reticulum" = "hotpink4", "Other" = "grey"
+  ), name = NULL)
+
+percent_barplot_theme(obj) +
+  ggtitle("% of proteins significantly enriched \nin Cre+ samples") +
+  theme(strip.text = element_blank(), panel.spacing.y = unit(0.2, "cm"))
+
+save_plot(
+  "s1j_summary",
+  ht = 2,
+  wd = 2.49
+)
+```
+
+# Figure 2
+
+## 2G: Volcano plots
+
+```{r, fig.width=4.5, fig.height=4.5}
+# read list of proteins to highlight
+highlight_proteins <- "reference_data/new_fig2_highlights.csv" %>%
+  read_csv(show_col_types = FALSE) %>%
+  mutate(key = paste(protein, tissue, comparison, sep = "_")) %>%
+  pull(key)
+
+df <- dep_path %>%
+  read_csv(show_col_types = FALSE) %>%
+  filter(
+    experiment %in% c("20220714_EV1_98", "20220807_EV1_101"),
+    comparison %in% c("fast vs. basal", "LPS vs. basal")
+  ) %>%
+  mutate(
+    tissue = case_when(Cre == "Albumin" ~ "Hepatocytes", TRUE ~ "Adipocytes"),
+    `Entry Name` = entry_name, group = Regulation, log2FC = log2_FC, comparison = case_when(comparison == "fast vs. basal" ~ "fasting", TRUE ~ "LPS")
+  ) %>%
+  add_alias()
+
+# build a annotation dataframe iteratively
+rows <- list()
+for (comp in unique(df$comparison)) {
+  for (mouse_tissue in unique(df$tissue)) {
+    tissue_name <- case_when(mouse_tissue == "Hepatocytes" ~ "liver", TRUE ~ "fat")
+    exp <- df %>% filter(comparison == comp, tissue == mouse_tissue)
+    n_up <- exp %>%
+      filter(Regulation == "Significant Up") %>%
+      nrow()
+    n_down <- exp %>%
+      filter(Regulation == "Significant Down") %>%
+      nrow()
+    up_row <- data.frame(
+      text = paste(n_up, "up \nin", comp, tissue_name, " "),
+      x_pos = Inf,
+      hjustvar = 1,
+      proteins = n_up,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    down_row <- data.frame(
+      text = paste(" ", n_down, "down\n. in", comp, tissue_name),
+      x_pos = -Inf,
+      hjustvar = -0,
+      proteins = n_down,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    rows <- append(rows, list(up_row, down_row))
+  }
+}
+annotation_df <- bind_rows(rows)
+
+label_df <-
+  df %>%
+  mutate(key = paste(alias, tissue, comparison, sep = "_")) %>%
+  filter(key %in% highlight_proteins, Regulation %in% c("Significant Up", "Significant Down"))
+
+x_lim <- max(abs(df$log2_FC))
+
+df %>%
+  mutate(Regulation = factor(Regulation, levels = names(REGULATION_COLORS))) %>%
+  arrange(Regulation) %>%
+  volcano_plot_base(
+    params = list(
+      stroke = LINE_WIDTH,
+      show_legend = FALSE,
+      palette = REGULATION_COLORS, alpha_palette = ALPHA_PALETTE
+    ),
+    left_annotation = "",
+    right_annotation = ""
+  ) +
+  geom_text(
+    data = annotation_df,
+    aes(
+      x = x_pos,
+      y = Inf,
+      hjust = hjustvar,
+      vjust = 1.25,
+      label = text
+    ),
+    inherit.aes = FALSE,
+    size = FONT_SIZE_MM,
+    fontface = "italic",
+    lineheight = 0.95
+  ) +
+  geom_text_repel(data = label_df %>% filter(log2_FC > 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = 5.5 * 0.352778, xlim = c(1.5, x_lim), nudge_x = 5, nudge_y = 1, segment.color = "grey70") +
+  geom_text_repel(data = label_df %>% filter(log2_FC < 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = 5.5 * 0.352778, xlim = c(-x_lim, 1.5), nudge_x = -5, nudge_y = 1, segment.color = "grey70") +
+  facet_grid(cols = vars(tissue), rows = vars(comparison), axes = "all", axis.labels = "all") +
+  xlim(-x_lim, x_lim) +
+  ylim(0, max(df$`-log10_pval`) + 1) +
+  xlab(expression("log"[2] * "(fold-change)")) +
+  theme(strip.text.y = TEXT_ELEMENT)
+
+
+
+save_plot(fn = "2g_volcano_plots", ht = 4.5, wd = 4.5)
+```
+
+## 2H GO-term analysis
+
+```{r, fig.width=2.6, fig.height=3.1}
+facetted_go_term <-
+  function(file_paths,
+           comparison_1,
+           comparison_2,
+           go_class = "biological_process", filter_direction = FALSE) {
+    # read concat go results
+    df <-
+      paste0(
+        PIPELINE_RESULTS_PATH,
+        "turboid_go_term_analysis_ref_list.csv"
+      ) %>%
+      read_csv(show_col_types = FALSE) %>%
+      filter( # filter to relevant results
+        experiment %in% file_paths
+      ) %>%
+      filter(
+        (
+          grepl(comparison_1, comparison) | grepl(comparison_2, comparison)
+        ),
+        direction != "up_and_down",
+        class == go_class
+      )
+
+    if (filter_direction) {
+      df <- df %>% filter(direction == "up")
+    }
+
+    df <- df %>% filter( # stringency filters
+      p_fdr_bh < 0.05,
+      n_genes > 4
+    ) %>%
+      # metadata
+      mutate(
+        tissue = recode(experiment, !!!setNames(names(file_paths), file_paths)),
+        comparison = str_split(comparison, " ") %>% map_chr(1),
+        comparison = factor(
+          comparison,
+          levels = c(
+            str_split(comparison_1, " ") %>% map_chr(1),
+            str_split(comparison_2, " ") %>% map_chr(1)
+          )
+        ),
+        `-log10(FDR)` = case_when(direction == "up" ~ `-log10(FDR)`, TRUE ~ -1 *
+          `-log10(FDR)`),
+        term = str_wrap(term, 30)
+      )
+    plt <- df %>%
+      # dot plot
+      ggplot(aes(
+        x = `-log10(FDR)`,
+        y = reorder_within(
+          term,
+          by = `-log10(FDR)`,
+          within = comparison,
+          fun = min
+        ),
+        size = n_genes,
+        fill = direction
+      )) +
+      geom_vline(
+        xintercept = 0,
+        color = "black",
+        size = LINE_WIDTH
+      ) +
+      geom_point(
+        shape = 21,
+        stroke = LINE_WIDTH,
+        color = "black"
+      ) +
+      facet_grid(
+        rows = vars(comparison),
+        cols = vars(tissue),
+        space = "free",
+        scales = "free_y"
+      ) +
+      scale_fill_manual(values = c("up" = "indianred2", "down" = "steelblue2")) +
+      scale_size_continuous(range = c(1, 2.7), name = NULL) +
+      scale_y_reordered() +
+      turboid_theme() +
+      theme(
+        legend.position = "bottom",
+        strip.text.y = element_text(
+          color = "black",
+          size = FONT_SIZE,
+          family = "Arial"
+        ),
+        panel.grid.major.y = element_line(color = "grey90", size = LINE_WIDTH),
+        legend.byrow = TRUE,
+        panel.spacing = unit(1, "mm"),
+        axis.text.y = element_text(
+          size = 6,
+          family = FONT_FAMILY,
+          color = "black"
+        )
+      ) +
+      labs(x = expression("log"[10] * "(FDR)"), y = NULL, ) +
+      scale_x_continuous(
+        expand = expansion(mult = c(0.2, 0.2)),
+        labels = function(x) {
+          abs(x)
+        }
+      ) +
+      guides(fill = FALSE)
+
+    print(plt)
+    return(df)
+  }
+
+facetted_go_term(
+  file_paths = list(
+    "Hepatocytes" = "20220714_EV1_98",
+    "Adipocytes" = "20220807_EV1_101"
+  ),
+  comparison_1 = "fast vs. basal",
+  comparison_2 = "LPS vs. basal"
+)
+
+save_plot("2h_go_term_ref_list",
+  ht = 3.1,
+  wd = 2.6
+)
+```
+
+## 2I Go term Correlation plot
+
+```{r, fig.width=2.2635, fig.height=4}
+get_study_genes <- function(go_term_name) {
+  # helper method to pull a list of
+  # genes related to a GO term
+  study_genes <- go_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(term == go_term_name) %>%
+    mutate(gene_list = str_extract_all(study_genes, "'[^']+'") %>%
+      map(~ str_remove_all(.x, "'"))) %>%
+    tidyr::unnest_longer(col = gene_list) %>%
+    pull(gene_list) %>%
+    unique()
+  return(study_genes)
+}
+
+go_term_correlation <- function(cell_type = "Hepatocytes", upper_limit = 6.4, lower_limit = -2.8, fn = "zHepatocyte_correlation_plot", label_genes = c(
+                                  "SAA2", "SAA1", "IRG1", "LPIN1", "CP4AE", "CP4AA", "CES1D", "APOA4", "CP7A1", "SERPINA3N"
+                                )) {
+  file_paths <- list(
+    "Hepatocytes" = "20220714_EV1_98",
+    "Adipocytes" = "20220807_EV1_101", fn = "2I_correlation_plot"
+  )
+
+  
+  go_term_name_1 <- "inflammatory response"
+  go_term_name_2 <- "cell adhesion"
+
+  alpha_palette <- c(
+    setNames(0.6, go_term_name_1),
+    setNames(0.6, go_term_name_2),
+    both = 0.7,
+    other = 0.4
+  )
+
+  fill_palette <- c(
+    setNames("#80c5ed", go_term_name_2),
+    setNames("#459343", go_term_name_1),
+    both = "#edb180",
+    other = "grey80"
+  )
+
+  study_genes_1 <- get_study_genes(go_term_name_1)
+  study_genes_2 <- get_study_genes(go_term_name_2)
+
+  # make a correlation plot
+
+  dep_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(
+      experiment == file_paths[cell_type],
+      comparison %in% c("fast vs. basal", "LPS vs. basal")
+    ) %>%
+    pivot_wider(
+      id_cols = c(entry_name, gene_name),
+      values_from = log2_FC,
+      names_from = comparison
+    ) %>%
+    mutate(`Entry Name` = entry_name) %>%
+    add_alias() %>%
+    drop_na() %>%
+    mutate(
+      group =
+        case_when(
+          (gene_name %in% study_genes_1) & (gene_name %in% study_genes_2) ~ "both",
+          (gene_name %in% study_genes_1) ~ go_term_name_1,
+          (gene_name %in% study_genes_2) ~ go_term_name_2,
+          TRUE ~ "other"
+        )
+    ) %>%
+    arrange(desc(group)) -> df
+
+
+
+  arc_df <- df %>% filter(group == "both")
+  arc_df <- arc_df %>%
+    tidyr::uncount(2) %>% # duplicate each row
+    mutate(
+      start = rep(c(0, pi), times = nrow(arc_df)),
+      end = rep(c(pi, 2 * pi), times = nrow(arc_df)),
+      fill = rep(c(go_term_name_1, go_term_name_2), times = nrow(arc_df)),
+      r0 = 0, # inner radius (center)
+      r = 0.11826955524 # outer radius (size of the point)
+    )
+
+  plt <- df %>%
+    ggplot(aes(x = `fast vs. basal`, y = `LPS vs. basal`, fill = group, alpha = group, label = alias)) +
+    geom_vline(xintercept = 0, size = LINE_WIDTH) +
+    geom_hline(yintercept = 0, size = LINE_WIDTH) +
+    geom_segment(
+      data = data.frame(),
+      aes(
+        x = lower_limit,
+        y = lower_limit,
+        xend = upper_limit,
+        yend = upper_limit
+      ),
+      size = LINE_WIDTH,
+      inherit.aes = FALSE
+    ) +
+    geom_point(
+      data = df,
+      shape = 21,
+      size = 1.7,
+      stroke = 0,
+      # stroke = LINE_WIDTH,
+      color = "black",
+      # alpha = 0.3,
+      show.legend = TRUE
+    ) +
+    geom_text_repel(
+      data = df %>% filter(alias %in% label_genes),
+      size = FONT_SIZE_MM,
+      show.legend = FALSE,
+      color = "black",
+      alpha = 1,
+      segment.size = LINE_WIDTH,
+      min.segment.length = 0,
+      family = FONT_FAMILY
+    ) +
+    ggtitle(paste0(
+      gsub("s", "", cell_type),
+      " LPS and fasting\ntreatment correlation (",
+      format(nrow(df), big.mark = ",", scientific = FALSE),
+      " proteins)"
+    )) +
+    scale_fill_manual(
+      values = fill_palette,
+      name = NULL
+    ) +
+    scale_alpha_manual(
+      values = alpha_palette,
+      name = NULL
+    ) +
+    guides(alpha = NULL, stroke = NULL, color = NULL, fill = guide_legend(nrow = 2)) +
+    labs(
+      x = expression("log"[2] * "(fast/basal)"),
+      y = expression("log"[2] * "(LPS/basal)")
+    ) +
+    turboid_theme() +
+    theme(legend.position = "top", legend.byrow = TRUE, aspect.ratio = 1, legend.margin = margin(b = -15), legend.key = element_blank()) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0)), limits = c(lower_limit, upper_limit)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0)), limits = c(lower_limit, upper_limit))
+
+  print(plt)
+
+  save_plot(fn, wd = 2.2635, ht = 4)
+  return(df)
+}
+
+# HEPATOCYTE
+df1 <- go_term_correlation(
+  label_genes = c("SAA2", "SAA1", "IRG1",  "CP4AE",  "APOA4", "SERPINA3N", "FGL1","5NTD", "FND3B",
+                  # new genes requested by CW
+                  "LICH", "PDIA4", "CFH"),
+  fn = "2l_goterm_correlation_plot"
+  )
+
+
+# ADIPOCYTE
+df <- go_term_correlation(
+  "Adipocytes", 
+  upper_limit = 4, 
+  lower_limit = -3.5, 
+  fn = "s2e_goterm_correlation_plot", 
+  label_genes = c("SERPINA3N", "C3", "MYO5A", "GBP5", "CD47", "5NTD", "FND3B", 
+                  # new genes requested by CW
+                  "TSP2", "THBS1", "GAS6"))
+
+df1 %>% arrange(by = `fast vs. basal`) %>% filter(group == "both")
+
+```
+
+```{r}
+df1 %>%filter(group == "cell adhesion") %>% arrange(desc(abs(`LPS vs. basal`)))
+```
+
+
+## S2A: overlap enrichment plot
+
+```{r, fig.width=4, fig.height=2.5}
+paste0(PIPELINE_RESULTS_PATH, "go_overlap_results.csv") %>%
+  read_csv(show_col_types = FALSE) %>%
+  filter(
+    class == "biological_process",
+    p_fdr_bh < 0.05,
+    n_genes > 4
+  ) %>%
+  mutate(
+    # clean intersect names
+    intersect = paste(set_1, set_2),
+    intersect = gsub("Significant Down", "down in", intersect),
+    intersect = gsub("Significant Up", "up in", intersect),
+    intersect = gsub("vs. basal_", "", intersect),
+    intersect = gsub(" down", " and down", intersect),
+    intersect = gsub(" up", " and up", intersect),
+    intersect = gsub("Adipocytes", "fat", intersect),
+    intersect = gsub("Hepatocytes", "liver", intersect),
+    intersect = gsub("_", " ", intersect)
+  ) -> df
+
+intersects_to_highlight <- c(
+  "down in LPS fat and down in fast fat",
+  "down in LPS liver and down in LPS fat",
+  "down in LPS liver and down in fast liver"
+)
+df %>%
+  filter(
+    intersect %in% intersects_to_highlight
+  ) %>%
+  mutate(intersect = factor(intersect, levels = intersects_to_highlight)) %>%
+  ggplot(aes(x = `-log10(FDR)`, y = reorder_within(term, by = `-log10(FDR)`, within = intersect), size = n_genes)) +
+  geom_point(shape = 21, fill = POINT_FILL, stroke = LINE_WIDTH) +
+  facet_rep_grid(space = "free", rows = vars(intersect), scales = "free_y") +
+  turboid_theme() +
+  scale_y_reordered() +
+  theme(strip.text.y = element_text(size = FONT_SIZE, color = "black", family = FONT_FAMILY, angle = 0), legend.position = "bottom", panel.spacing.y = unit(0, "cm"), panel.border = element_blank(), axis.line.x = AXIS_LINE, axis.line.y = AXIS_LINE) +
+  scale_size_continuous(range = c(1, 3)) +
+  labs(
+    x = expression("-log"[10] * "(FDR)"), y = NULL
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0.2, 0.2)))
+save_plot("s2a_go_term", wd = 4, ht = 2.5)
+```
+
+## S2 correlation with margins
+
+```{r, fig.width=2, fig.height=4}
+correlation_plot <-
+  function(timepoints,
+           sample_type,
+           min,
+           max,
+           correlation_palette,
+           num_top = 6,
+           x_lab,
+           y_lab,
+           drop = NULL,
+           top = c()) {
+    # constants for defining position of margins
+    margin_factor <- 0.85
+    margin_position <- min * margin_factor
+    missing_point_value <- (min + margin_position) / 2
+
+    combined_df <- NULL
+    for (timepoint in names(timepoints)) {
+      df <-
+        read_experiment(timepoints[timepoint], sample_type[timepoint])
+      #print("df")
+      #print(colnames(df))
+      df <- df %>%
+        dplyr::select(
+          starts_with("log2_FC"),
+          starts_with("-log10_pval"),
+          uniprot_id,
+          `Entry Name`
+        ) %>%
+        add_alias() %>%
+        mutate(time_point = timepoint) %>%
+        dplyr::select(-contains("cre+")) %>%
+        dplyr::select(-contains(drop))
+      print(timepoints[timepoint])
+      print("HPGD" %in% df$alias)
+      colnames(df) <-
+        c(
+          "log2_FC",
+          "log10_pval",
+          "uniprot_id",
+          "Entry Name",
+          "protein",
+          "alias",
+          "time_point"
+        )
+      combined_df <- rbind(df, combined_df)
+    }
+
+    log_threshold <- -log10(0.05)
+    
+    #print("Combined DF")
+    #print(colnames(combined_df))
+
+    wide_df <- combined_df %>%
+      pivot_wider(
+        names_from = time_point,
+        values_from = c(log2_FC, log10_pval)
+      )
+    #print("Wide DF")
+    #print(colnames(wide_df))
+    #return(wide_df)
+
+    
+    combined_df <- wide_df %>%
+      mutate(
+        significance = case_when(
+          (log10_pval_x > log_threshold) &
+            (log10_pval_y > log_threshold) ~ names(correlation_palette[4])[1],
+          (log10_pval_y > log_threshold) ~ names(correlation_palette[2])[1],
+          (log10_pval_x > log_threshold) ~ names(correlation_palette[1])[1],
+          TRUE ~ names(correlation_palette[3])[1]
+        )
+      ) %>%
+      mutate(
+        #significance = factor(significance, levels = names(correlation_palette)),
+        dist_from_orig = sqrt(log2_FC_x^2 + log2_FC_y^2),
+        distance_from_identity = abs(log2_FC_x - log2_FC_y)
+      ) 
+
+    # calculate pearson's correlation from complete cases
+    pearson_r <- cor(combined_df$log2_FC_x, combined_df$log2_FC_y, use = "complete.obs") %>%
+      round(digits = 2)
+
+
+    print(max(combined_df$log2_FC_x, na.rm = TRUE))
+    print(max(combined_df$log2_FC_y, na.rm = TRUE))
+    print(min(combined_df$log2_FC_x, na.rm = TRUE))
+    print(min(combined_df$log2_FC_y, na.rm = TRUE))
+
+    combined_df <- combined_df %>%
+      # replace missing values with values on the margins
+      replace_na(list(log2_FC_x = missing_point_value, log2_FC_y = missing_point_value))
+
+    # pull list of proteins to give text labels
+    significant_no_missing <- combined_df %>%
+      filter(
+        significance != "Not significant",
+        log2_FC_x != missing_point_value,
+        log2_FC_y != missing_point_value
+      )
+    label_data <- rbind(
+      # top by distance from identity
+      significant_no_missing %>%
+        arrange(distance_from_identity) %>%
+        tail(num_top),
+      # top by distance from origin
+      significant_no_missing %>%
+        arrange(dist_from_orig) %>%
+        tail(num_top),
+      # top only quantified at x
+      combined_df %>%
+        arrange(abs(log2_FC_x)) %>%
+        filter(
+          significance != "Not significant",
+          (log2_FC_y == missing_point_value)
+        ) %>%
+        tail(num_top / 2),
+      # top only quantified at y
+      combined_df %>%
+        arrange(abs(log2_FC_y)) %>%
+        filter(
+          significance != "Not significant",
+          (log2_FC_x == missing_point_value)
+        ) %>%
+        tail(num_top / 2)
+    ) %>% distinct()
+    
+    if (length(top) > 0){
+      label_data <- combined_df %>% filter(significance != "Not significant", alias %in% top)
+    }
+    
+    print(top[!top %in% unique(label_data$alias)])
+    print("CAVIN2" %in% combined_df$alias)
+    print("SDPR" %in% combined_df$alias)
+
+    plot <- combined_df %>%
+      # sort so labeled points are stacked on top
+      mutate(z_order = alias %in% unique(label_data$alias)) %>%
+      arrange(z_order) %>%
+      ggplot(aes(
+        x = log2_FC_x,
+        y = log2_FC_y,
+        fill = significance,
+        label = alias
+      )) +
+      # margin lines
+      geom_hline(
+        yintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      geom_vline(
+        xintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      # origin lines
+      geom_hline(
+        yintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      geom_vline(
+        xintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      # diagonal boundary lines
+      geom_segment(
+        data = data.frame(),
+        aes(
+          x = c(margin_position, margin_position, margin_position + 1),
+          y = c(margin_position + 1, margin_position, margin_position),
+          xend = c(max - 1, max, max),
+          yend = c(max, max, max - 1),
+          linetype = c("dashed", "solid", "dashed")
+        ),
+        size = LINE_WIDTH,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        color = "black"
+      ) +
+      # scatterplot
+      geom_point(
+        shape = 21,
+        stroke = 0,
+        alpha = 0.55,
+        size = 1.4,
+      ) +
+      # protein labels
+      geom_text_repel(
+        data = label_data,
+        size = 1.94028,
+        family = FONT_FAMILY,
+        min.segment.length = 0,
+        #force = 3,
+        segment.size = LINE_WIDTH,
+        max.overlaps = Inf,
+        #nudge_y = -2,
+        #nudge_x = 2,
+        show.legend = FALSE#,
+        #segment.curvature = -0.1,
+      #segment.ncp = 3,
+      #segment.angle = 45
+      ) +
+      turboid_theme() +
+      theme(
+        aspect.ratio = 1,
+        # 20 lines of legend formatting
+        legend.position = "top",
+        legend.text = element_text(
+          size = 6,
+          color = "black",
+          family = "Arial",
+          margin = margin(l = 0)
+        ),
+        legend.box.background = element_blank(),
+        legend.justification.top = "top",
+        legend.justification = "center",
+        legend.box.just = "center",
+        legend.key = element_blank(),
+        legend.margin = margin(l = -5, b = -5.5),
+        legend.box.margin = margin(l = -5, b = -0.8),
+        legend.key.spacing.y = unit(-0.9, "cm"),
+        legend.key.spacing.x = unit(-0.1, "cm")
+      ) +
+      guides(fill = guide_legend(nrow = 2, override.aes = list(alpha = 1))) +
+      labs(
+        x = x_lab,
+        y = y_lab
+      ) +
+      scale_fill_manual(values = correlation_palette, name = NULL) +
+      scale_x_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_y_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_linetype_manual(values = c("dashed" = "dashed", "solid" = "solid")) +
+      geom_text(
+        mapping = aes(
+          x = min * 0.6,
+          y = max * 0.85,
+        ),
+        label = paste("R = ", as.character(pearson_r)),
+        inherit.aes = FALSE,
+        data = data.frame(),
+        size = 1.94028,
+        family = FONT_FAMILY
+      )
+
+    print(plot)
+  }
+
+correlation_min <- -5
+correlation_max <- 6.4
+
+not_significant <- "grey80"
+
+# liver vs plasma LPS stimulation
+correlation_plot(
+  timepoints = c(
+    "x" = "20220714_EV1_98", # x is liver
+    "y" = "20220807_EV1_101" # y is fat
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "tissue"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "liver p < 0.05" = "#d6e5b3",
+    "iWAT p < 0.05" = "#75c489",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#5d8f70"
+  ),
+  num_top = 6,
+  x_lab = expression("liver, log"[2] * "(LPS/basal)"),
+  y_lab = expression("iWAT, log"[2] * "(LPS/basal)"),
+  drop = "fast",
+  top = c("IFIT1","SAMP","SERPINA3N","EST1","STEA4","IRG1", 'FAM20C', 'EST1C', 'IFIH1', 'HEMO', 'EST2A', 'LAMA4', 'GBP5', 'CTNA1', 'CDS2', 'LPL')
+)
+
+
+save_plot(
+  fn = "s2g_correlation",
+  wd = 2,
+  ht = 4
+)
+
+wide_df <- correlation_plot(
+  timepoints = c(
+    "x" = "20220714_EV1_98", # x is liver
+    "y" = "20220807_EV1_101" # y is fat
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "tissue"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "liver p < 0.05" = "#c4dfec",
+    "iWAT p < 0.05" = "#85c6ed",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#4482c3"
+  ),
+  num_top = 5,
+  x_lab = expression("liver, log"[2] * "(fast/basal)"),
+  y_lab = expression("iWAT, log"[2] * "(fast/basal)"),
+  drop = "LPS",
+  top = c("LIFR","LPIN1","SAA1","SAA2","TSP2",'FAM20C', 'EST1C', 'IFIH1', 'HEMO', 'EST2A', 'LAMA4', 'GBP5', 'CTNA1', 'CDS2', 'LPL')
+)
+
+save_plot(
+  fn = "s2h_correlation",
+  wd = 2,
+  ht = 4
+)
+
+```
+
+## 2J heatmaps
+
+```{r}
+get_plot_width <- function(n) {
+  # return(10)
+  return(0.0708 * n + 1.3220833333)
+  # return ((0.02 * n)  + 0.898)
+}
+prepare_fc_data <- function(experiment, control_name, filter_to_sig = FALSE) {
+  experiment <- experiment %>%
+    mutate(protein = gsub(pattern = "_MOUSE", "", `Entry Name`)) %>%
+    add_alias()
+  # filter proteome to genes to display
+  df <- experiment %>%
+    dplyr::select(uniprot_id, contains("Regulation") & contains(control_name)) %>%
+    pivot_longer(cols = contains("Regulation") & !contains("cre+")) %>%
+    filter((value == "Significant Up") | (value == "Significant Down"))
+  uniprot_list <- df %>%
+    pull(uniprot_id) %>%
+    unique()
+
+  if (filter_to_sig) {
+    experiment <- experiment %>%
+      filter(uniprot_id %in% uniprot_list)
+  }
+
+  heatmap_data <- experiment %>%
+    column_to_rownames("alias") %>%
+    # select signal intensity columns
+    dplyr::select(contains("cre+_") & !contains("ratio")) %>%
+    dplyr::select(sort(names(.)))
+
+  # sample names containing "basal" or ctrl name
+  basal_samples <- grepl(control_name, colnames(heatmap_data))
+
+  fold_change <- heatmap_data / rowMeans(heatmap_data[, basal_samples])
+
+  fold_change %>%
+    # drop basal samples
+    dplyr::select(-c(colnames(heatmap_data)[basal_samples])) %>%
+    # sort columns so each organ table has the same column order
+    dplyr::select(order(colnames(.))) %>%
+    as.matrix() %>%
+    # log2 transform
+    log2() %>%
+    as.data.frame() %>%
+    filter(apply(., 1, function(x) all(is.finite(x)))) %>%
+    as.matrix() %>%
+    t() %>%
+    return()
+}
+
+
+fc_heatmap <- function(experiment, output_filename, width, height, control_name = "basal", group_colors = c("#7FC5ED", "#459343"), n_cell_types = 2, labels = c("Fast", "LPS"), col_name_rot = 45, col_names_size, save_file = TRUE) {
+  heatmap_data <- experiment
+  # font settings
+  text_graphics <- gpar(fontsize = 6, fontfamily = "Arial")
+
+  column_gap <- unit(0.5, "mm")
+  legend_height <- unit(2, "mm")
+  ht_opt(COLUMN_ANNO_PADDING = column_gap)
+  ht_opt(HEATMAP_LEGEND_PADDING = column_gap)
+  ht_opt(TITLE_PADDING = column_gap)
+
+
+  # get condition labels from sample names
+  heatmap_data %>%
+    rownames() %>%
+    # condition is sample name before the first "_"
+    lapply(function(x) str_split_1(x, "_")[1]) -> metadata
+
+  metadata %>%
+    unlist() %>%
+    recode(!!!c("fast" = "Fasting")) -> condition_labels
+
+  metadata %>%
+    lapply(function(x) str_split_1(x, " ")[1]) %>%
+    unlist() -> cell_type_labels
+
+
+
+  if (n_cell_types == 2) {
+    # For 2 cell types, get the first cell type's LPS rows
+    # The first LPS group should be the first occurrence of "LPS" label
+    lps_rows <- which(condition_labels == "LPS")
+    if (length(lps_rows) > 0) {
+      # Take only the first half of LPS rows (first cell type)
+      first_cell_lps_rows <- lps_rows[1:(length(lps_rows) / 2)]
+      lps_means <- colMeans(heatmap_data[first_cell_lps_rows, , drop = FALSE])
+      # Sort columns by descending mean values (highest to lowest)
+      col_order <- order(lps_means, decreasing = TRUE)
+      # Reorder the heatmap data
+      heatmap_data <- heatmap_data[, col_order]
+    }
+  } else {
+    # For single cell type, use all LPS rows
+    lps_rows <- which(condition_labels == "LPS")
+    if (length(lps_rows) > 0) {
+      lps_means <- colMeans(heatmap_data[lps_rows, , drop = FALSE])
+      # Sort columns by descending mean values (highest to lowest)
+      col_order <- order(lps_means, decreasing = TRUE)
+      # Reorder the heatmap data
+      heatmap_data <- heatmap_data[, col_order]
+    }
+  }
+
+
+  # build heatmap condition color labels
+  cond_annotation <- rowAnnotation(
+    empty = anno_empty(border = FALSE, width = unit(4, "mm")),
+    simple_anno_size_adjust = TRUE,
+    condition = anno_block(
+      gp = gpar(fill = group_colors, col = "transparent", alpha = 0.6),
+      labels = rep(labels, n_cell_types),
+      labels_gp = gpar(fontsize = 6, fontfamily = "Arial"),
+      which = "row",
+      width = unit(4, "mm")
+    )
+  )
+  organ <- "liver"
+  main_heatmap <- heatmap_data %>%
+    Heatmap(
+      name = "heatmap",
+      cluster_rows = FALSE,
+      # cluster within slices, but not across
+      cluster_columns = FALSE,
+      cluster_row_slices = TRUE,
+      row_title = NULL,
+      show_row_dend = FALSE,
+      show_column_dend = FALSE,
+      column_title_gp = text_graphics,
+      col = colorRamp2(c(-2, 0, 2), c("blue", "white", "red")),
+      row_split = condition_labels,
+      left_annotation = cond_annotation,
+      show_row_names = FALSE,
+      column_gap = column_gap,
+      row_gap = unit(0.5, "mm"),
+      column_names_gp = gpar(fontsize = col_names_size, fontfamily = "Arial"),
+      column_names_side = "bottom",
+      column_names_rot = col_name_rot,
+      heatmap_legend_param = list(
+        title = substitute(
+          paste("log"[2], "(FC from ", m, ")"), list(m = control_name)
+        ),
+        legend_height = legend_height,
+        title_gp = text_graphics,
+        labels_gp = text_graphics,
+        border = "transparent",
+        grid_width = unit(2, "mm")
+      ),
+    )
+
+  if (save_file) {
+    pdf(
+      file = paste0(PLOT_RESULTS_PATH, output_filename),
+      width = width,
+      height = height
+    )
+
+    set.seed(333)
+    draw(main_heatmap, ht_gap = column_gap)
+    dev.off()
+  } else {
+    draw(main_heatmap, ht_gap = column_gap)
+  }
+  return(main_heatmap)
+}
+
+group_block_anno <- function(
+    group, empty_anno, gp = gpar(),
+    label = NULL, label_gp = gpar()) {
+  # adding group labels to multiple row splits
+
+  seekViewport(qq("annotation_@{empty_anno}_@{max(group)}"))
+  loc1 <- deviceLoc(x = unit(0, "npc"), y = unit(0, "npc"))
+  seekViewport(qq("annotation_@{empty_anno}_@{min(group)}"))
+  loc2 <- deviceLoc(x = unit(1, "npc"), y = unit(1, "npc"))
+
+  seekViewport("global")
+  grid.rect(loc1$x, loc1$y,
+    width = loc2$x - loc1$x, height = loc2$y - loc1$y,
+    just = c("left", "bottom"), gp = gp
+  )
+  if (!is.null(label)) {
+    grid.text(label, x = (loc1$x + loc2$x) * 0.5, y = (loc1$y + loc2$y) * 0.5, gp = label_gp, rot = 90)
+  }
+}
+
+go_terms <- c("immune system process", "extracellular matrix organization")
+
+
+cell_configs <- list(
+  "Adipocytes" = list(experiment = "20220807_EV1_101", plot_width = 7.5),
+  "Hepatocytes" = list(experiment = "20220714_EV1_98", plot_width = 5.5)
+)
+for (go_term_name in go_terms) {
+  for (cell_type in names(cell_configs)) {
+    config <- cell_configs[[cell_type]]
+
+    gt <- get_study_genes(go_term_name)
+    df1 <- read_experiment(config$experiment, "tissue") %>%
+      filter(gene_name %in% gt) %>%
+      prepare_fc_data("basal", filter_to_sig = TRUE)
+    print(ncol(df1))
+    plot_width <- get_plot_width(ncol(df1))
+    print(plot_width)
+    pdf(
+      file = paste0(
+        PLOT_RESULTS_PATH,
+        paste0("s2_", go_term_name, cell_type, ".pdf")
+      ),
+      width = plot_width,
+      height = 1
+    )
+
+    df1 %>% fc_heatmap(
+      output_filename = "aa",
+      n_cell_types = 1,
+      col_names_size = 5,
+      col_name_rot = 90,
+      save_file = FALSE
+    )
+    lbl_gp <- gpar(
+      col = "black",
+      fontsize = 6,
+      rot = 0,
+      fontfamily = FONT_FAMILY
+    )
+    group_block_anno(
+      c(1, 2),
+      "empty",
+      gp = gpar(fill = "grey90", col = "white"),
+      label = cell_type,
+      label_gp = lbl_gp
+    )
+    dev.off()
+  }
+}
+```
+
+### Heatmap with both cell types
+
+```{r}
+go_term_name <- "vesicle-mediated transport"
+go_term_name <- "cell adhesion"
+
+for (go_term_name in c("protein glycosylation", "protein folding", "cell adhesion")) {
+  gt <- get_study_genes(go_term_name)
+  print(gt)
+  # gt <- c("Fgb","Fgg","C3","C4b","Fga","Apoa1","C6","Stat1","Apcs","Apoa4","Tfrc","Pml","Hp","Rbp4")
+  # gt <- c("Itgb1","Col18a1","St3gal4","Sorbs3","Slc4a1","Itgb5","Fndc3b","Siglec1","Ptprd","Gpc4","Dmd","Tgm2","Afdn","Parva")
+  df2 <- read_experiment("20220714_EV1_98", "tissue") %>%
+    filter(gene_name %in% gt) %>%
+    prepare_fc_data("basal")
+  rownames(df2) <- paste("Hepatocytes", rownames(df2))
+  df1 <- read_experiment("20220807_EV1_101", "tissue") %>%
+    filter(gene_name %in% gt) %>%
+    prepare_fc_data("basal")
+  rownames(df1) <- paste("Adipocytes", rownames(df1))
+  df2 <- df2[, colnames(df2)[colnames(df2) %in% colnames(df1)]]
+  df1 <- df1[, colnames(df2)]
+  mat <- rbind(df1, df2)
+
+  hepatocytes_lps_rows <- grep("^Hepatocytes LPS", rownames(mat))
+  col_means <- colMeans(mat[hepatocytes_lps_rows, ])
+  mat <- mat[, order(col_means, decreasing = TRUE)]
+
+
+  pdf(
+    file = paste0(PLOT_RESULTS_PATH, paste0("s2j_2celltypes_", go_term_name, ".pdf")),
+    width = get_plot_width(ncol(mat)),
+    # width = 10,
+    height = 1.53
+  )
+  print(ncol(mat))
+  mat %>%
+    as.data.frame() %>%
+    fc_heatmap(output_filename = "aa", col_names_size = 5, save_file = FALSE, col_name_rot = 90)
+
+  lbl_gp <- gpar(col = "black", fontsize = 6, rot = 0, fontfamily = FONT_FAMILY)
+  group_block_anno(c(1, 2), "empty", gp = gpar(fill = "grey90", col = "white"), label = "Adipocytes", label_gp = lbl_gp)
+  group_block_anno(c(3, 4), "empty", gp = gpar(fill = "grey90", col = "white"), label = "Hepatocytes", label_gp = lbl_gp)
+  dev.off()
+}
+mat
+```
+
+### Heatmap with one cell type
+
+```{r}
+go_terms <- c("immune system process", "extracellular matrix organization")
+
+
+cell_configs <- list(
+  "Adipocytes" = list(experiment = "20220807_EV1_101", plot_width = 7.5),
+  "Hepatocytes" = list(experiment = "20220714_EV1_98", plot_width = 5.5)
+)
+for (go_term_name in go_terms) {
+  for (cell_type in names(cell_configs)) {
+    config <- cell_configs[[cell_type]]
+
+    gt <- get_study_genes(go_term_name)
+    df1 <- read_experiment(config$experiment, "tissue") %>%
+      filter(gene_name %in% gt) %>%
+      prepare_fc_data("basal", filter_to_sig = TRUE)
+    print(ncol(df1))
+    plot_width <- (0.078 * ncol(df1)) + 0.898
+    print(plot_width)
+    pdf(
+      file = paste0(
+        PLOT_RESULTS_PATH,
+        paste0("s2_", go_term_name, cell_type, ".pdf")
+      ),
+      width = plot_width,
+      height = 1
+    )
+
+    df1 %>% fc_heatmap(
+      output_filename = "aa",
+      n_cell_types = 1,
+      col_names_size = 5,
+      col_name_rot = 90,
+      save_file = FALSE
+    )
+    lbl_gp <- gpar(
+      col = "black",
+      fontsize = 6,
+      rot = 0,
+      fontfamily = FONT_FAMILY
+    )
+    group_block_anno(
+      c(1, 2),
+      "empty",
+      gp = gpar(fill = "grey90", col = "white"),
+      label = cell_type,
+      label_gp = lbl_gp
+    )
+    dev.off()
+  }
+}
+```
+
+# Figure 3
+
+## 3B: Outcyte Percent barplot
+
+```{r, fig.width=2.2, fig.height=1.1}
+alb_plasma <- read_experiment("20221129_EV1_136", "serum") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "Albumin\nCre")
+outcyte_df <- read_experiment("20221130_EV1_137", "serum") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "Adiponectin\nCre") %>%
+  rbind(alb_plasma)
+
+outycte_barplot <- function(df) {
+  obj <- df %>%
+    mutate(Outcyte = replace_na(Outcyte, "NA"), Outcyte = recode(Outcyte, !!!replace_list), Outcyte = factor(Outcyte, levels = rev(names(palette)))) %>%
+    ggplot(aes(y = experiment, fill = Outcyte)) +
+    geom_bar(
+      position = "fill",
+      color = "black",
+      size = LINE_WIDTH,
+      width = 0.65
+    ) +
+    scale_fill_manual(values = palette) +
+    theme(
+      legend.key.size = unit(1, "mm"),
+      legend.key.height = unit(1, "mm"),
+      legend.key.width = unit(1, "mm"),
+      legend.key = element_rect(fill = NA)
+    )
+
+  plt <- percent_barplot_theme(obj)
+  print(plt)
+}
+
+outycte_barplot(outcyte_df)
+
+save_plot("3b_percent_barplot", wd = 2.2, ht = 1.1)
+
+
+```
+
+## 3C: Heatmap
+
+```{r, fig.width=2.5, fig.height=6.7}
+fc_heatmap_with_annotation <-
+  function(experiment,
+           output_filename,
+           width,
+           height,
+           control_name = "basal",
+           group_colors = c("#7FC5ED", "#459343")) {
+    experiment <- experiment %>%
+      mutate(protein = gsub(pattern = "_MOUSE", "", `Entry Name`)) %>%
+      add_alias()
+    # filter proteome to genes to display
+    uniprot_list <- experiment %>%
+      dplyr::select(uniprot_id, contains("Regulation") &
+        contains(control_name)) %>%
+      pivot_longer(cols = contains("Regulation")) %>%
+      filter(value == "Significant Up" |
+        value == "Significant Down") %>%
+      pull(uniprot_id) %>%
+      unique()
+    experiment <- experiment %>%
+      filter(uniprot_id %in% uniprot_list)
+
+    # save outcyte predictions
+    outcyte <- experiment %>%
+      dplyr::select(alias, Outcyte) %>%
+      mutate(
+        Outcyte = replace_na(Outcyte, "NA"),
+        Outcyte = recode(Outcyte, !!!replace_list),
+        Outcyte = factor(Outcyte, levels = rev(names(palette)))
+      ) %>%
+      column_to_rownames("alias")
+
+    # load Arial font
+    loadfonts()
+    # font settings
+    text_graphics <- gpar(fontsize = 6, fontfamily = "Arial")
+
+    heatmap_data <- experiment %>%
+      column_to_rownames("alias") %>%
+      # select signal intensity columns
+      dplyr::select(contains("cre+_") & !contains("ratio")) %>%
+      dplyr::select(sort(names(.)))
+
+    # sample names containing "basal"
+    basal_samples <- grepl(control_name, colnames(heatmap_data))
+
+    fold_change <- heatmap_data / rowMeans(heatmap_data[, basal_samples])
+
+    heatmap_data <- fold_change %>%
+      # drop basal samples
+      dplyr::select(-c(colnames(heatmap_data)[basal_samples])) %>%
+      # sort columns so each organ table has the same column order
+      dplyr::select(order(colnames(.))) %>%
+      as.matrix() %>%
+      # log2 transform
+      log2() %>%
+      as.data.frame() %>%
+      filter(apply(., 1, function(x) {
+        all(is.finite(x))
+      })) %>%
+      as.matrix()
+    print(heatmap_data)
+
+    column_gap <- unit(0.5, "mm")
+    legend_height <- unit(2, "mm")
+    ht_opt(COLUMN_ANNO_PADDING = column_gap)
+    ht_opt(HEATMAP_LEGEND_PADDING = column_gap)
+    ht_opt(TITLE_PADDING = column_gap)
+
+
+    # get condition labels from sample names
+    condition_labels <- heatmap_data %>%
+      colnames() %>%
+      # condition is sample name before the first "_"
+      lapply(function(x) {
+        str_split_1(x, "_")[1]
+      }) %>%
+      unlist() %>%
+      recode(!!!c("fast" = "Fasting"))
+    # build heatmap condition color labels
+    cond_annotation <- HeatmapAnnotation(
+      simple_anno_size_adjust = TRUE,
+      condition = anno_block(
+        gp = gpar(fill = group_colors, col = "transparent"),
+        height = unit(2, "mm"),
+      )
+    )
+    organ <- "liver"
+    main_heatmap <- heatmap_data %>%
+      Heatmap(
+        name = "x",
+        cluster_rows = TRUE,
+        # cluster within slices, but not across
+        cluster_columns = FALSE,
+        cluster_column_slices = TRUE,
+        show_row_dend = FALSE,
+        show_column_dend = FALSE,
+        column_title_gp = text_graphics,
+        col = colorRamp2(c(-2, 0, 2), c("blue", "white", "red")),
+        column_split = condition_labels,
+        top_annotation = cond_annotation,
+        show_column_names = FALSE,
+        column_gap = column_gap,
+        row_gap = unit(0.5, "mm"),
+        # rect_gp = gpar(col = "white", lwd = LINE_WIDTH),
+        row_names_gp = gpar(fontsize = 5.5, fontfamily = "Arial"),
+        row_names_side = "right",
+        heatmap_legend_param = list(
+          # label organ in heatmap legend
+          title = substitute(
+            paste(n, " log"[2], "(FC from ", m, ")"),
+            list(n = organ, m = control_name)
+          ),
+          legend_height = legend_height,
+          title_gp = text_graphics,
+          labels_gp = text_graphics,
+          border = "transparent",
+          grid_width = unit(2, "mm")
+        ),
+      )
+    # create a separate heatmap for Outcyte class predictions
+    outcyte_heatmap <-
+      outcyte[rownames(heatmap_data), , drop = FALSE] %>%
+      as.matrix() %>%
+      Heatmap(
+        name = "class",
+        show_column_names = FALSE,
+        col = palette,
+        column_title_gp = text_graphics,
+        heatmap_legend_param = list(
+          title = expression("class"),
+          legend_height = legend_height,
+          title_gp = text_graphics,
+          labels_gp = text_graphics,
+          border = "transparent",
+          grid_width = unit(2, "mm")
+        ),
+        column_gap = column_gap,
+        row_names_side = "right",
+        row_names_gp = gpar(fontsize = 5.5, fontfamily = "Arial")
+      )
+
+    ht_list <- main_heatmap + outcyte_heatmap
+    pdf(
+      file = paste0(PLOT_RESULTS_PATH, output_filename),
+      width = width,
+      height = height
+    )
+
+    set.seed(333)
+    draw(ht_list, ht_gap = column_gap)
+    dev.off()
+    draw(ht_list, ht_gap = column_gap)
+  }
+
+```
+
+```{r, fig.width=2.2, fig.height=6.65}
+
+read_experiment("20221129_EV1_136", "serum") %>%
+  fc_heatmap_with_annotation(output_filename = "3c_heatmap.pdf", width = 2.25, height = 6.65)
+```
+
+## 3D: heatmap
+
+```{r, fig.width=2.25, fig.height=5.15}
+read_experiment("20221130_EV1_137", "serum") %>% fc_heatmap_with_annotation(output_filename = "3d_heatmap.pdf", width = 2.25, height = 4.95)
+```
+
+## 3E: Abundance plot
+
+```{r, fig.width=2, fig.height=4}
+
+
+abundance_plot <- function(experiment, sample_type, condition, label_proteins) {
+  
+  # prep published data
+published_data <-
+  '/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/Published data sets for comparison/Mouse/Absolute plasma concentrations/AbsolutePlasmaConcentrations_forHenry.csv' %>%
+  read_csv(show_col_types = FALSE) %>%
+  # drop missing data
+  rename(
+    c(
+      "published_concentration" = "Concentration in mouse plasma (pmol ml-1)"
+    )
+  ) %>%
+  select(uniprot_id, published_concentration)
+
+  # prep signal intensity data
+  df <- read_experiment(experiment, "serum") %>%
+    add_alias() %>%
+    # select ID and signal intensity columns
+    select(
+      c(uniprot_id, alias, Outcyte, Mass),
+      contains(condition) & contains("cre+")
+    ) %>%
+    mutate(Mass = as.numeric(Mass)) %>%
+    select(-c(contains("cre-"))) %>%
+    # take mean signal intensity
+    pivot_longer(cols = -c(uniprot_id, alias, Outcyte, Mass)) %>%
+    group_by(uniprot_id, alias, Outcyte, Mass) %>%
+    summarise(mean_signal_intensity = mean(value)) %>%
+    left_join(published_data, by = "uniprot_id") %>%
+    ungroup() %>%
+    mutate(rank = order(order(mean_signal_intensity, decreasing = TRUE))) %>%
+    arrange(!is.na(mean_signal_intensity), mean_signal_intensity)
+  
+  df %>% filter(alias == "TSP4") %>% print()
+
+  lbl_df <- df %>% filter(alias %in% label_proteins)
+
+  plt <-
+    df %>% ggplot(aes(
+      x = rank,
+      y = log2(mean_signal_intensity),
+      fill = log2(published_concentration),
+      color = log2(published_concentration)
+    )) +
+    geom_point(
+      shape = 21,
+      color = "black",
+      stroke = 0,
+      size = 1.5,
+      alpha = 0.4,
+      show.legend = FALSE
+    ) +
+    geom_point(
+      data = lbl_df,
+      shape = 21,
+      color = "black",
+      stroke = LINE_WIDTH,
+      size = 1.5,
+      alpha = 1
+    ) +
+    turboid_theme() +
+    scale_y_continuous(breaks = c(15, 20, 25), expand = expansion(mult = c(0.2, 0.1))) +
+    theme(aspect.ratio = 1, legend.position = "top", legend.key.height = unit(2.5, "mm"), legend.key.width = unit(4, "mm")) +
+    scale_fill_gradient2(midpoint = 7.375, high = "red", low = "blue", na.value = "grey70", limits = c(-1, 16), name = "log2 pmol concentration") +
+    scale_color_gradient2(midpoint = 7.375, high = "red", low = "blue", na.value = "grey90", limits = c(-1, 16), name = "log2 pmol concentration") +
+    geom_rug(sides = "b", alpha = 0.4, length = unit(2, "mm"), show.legend = FALSE) +
+    labs(
+      y = substitute(
+        paste("log"[2], "(mean signal intensity) ", m, " plasma"), list(m = condition)
+      ),
+      x = "protein rank"
+    ) +
+    geom_text_repel(data = lbl_df, mapping = aes(label = alias), size = FONT_SIZE_MM, min.segment.length = 0, segment.size = LINE_WIDTH, box.padding = 0.5, color = "black", max.overlaps = Inf, force = 2, nudge_y = 2)
+  print(max(log2(df$published_concentration), na.rm = TRUE))
+
+  print(plt)
+}
+
+```
+
+```{r, fig.width=2, fig.height=4}
+abundance_plot(
+  experiment = "20221129_EV1_136",
+  sample = "plasma",
+  condition = "basal",
+  label_proteins = c("APOA1","C5","FIBG","CFH","LIFR","FA5","MBL2","TRFE","HEMO","MASP2","FA9","MUG2","FGL1","PLSL")
+)
+save_plot(
+  fn = paste0("3e_abundance_plot_hepatocyte"),
+  ht = 4,
+  wd = 2
+)
+
+abundance_plot(
+  experiment = "20221130_EV1_137",
+  sample = "plasma",
+  condition = "basal",
+  label_proteins = c("LIFR","CPN2","LRP1","ADIPO","PLSL","CFD","TGFB1","TSP4")
+)
+save_plot(
+  fn = paste0("3e_abundance_plot_adipocyte"),
+  ht = 4,
+  wd = 2
+)
+
+log2(47554.3)
+```
+
+
+## S3B: Correlation scatterplot
+
+```{r, fig.width=4, fig.height=2}
+
+
+abundance_scatterplot <- function(experiment, label_proteins, fig_num){
+  df <- read_experiment(experiment, "serum") %>%
+    add_alias()
+  print(df %>% filter(alias == "LRP1"))
+    # select ID and signal intensity columns
+    df <- df %>% select(
+      c(uniprot_id, alias, Outcyte, Mass),
+      contains("basal") & contains("cre+")
+    ) %>%
+    mutate(Mass = as.numeric(Mass)) %>%
+    select(-c(contains("cre-"))) %>%
+    # take mean signal intensity
+    pivot_longer(cols = -c(uniprot_id, alias, Outcyte, Mass)) %>%
+    group_by(uniprot_id, alias, Outcyte, Mass) %>%
+    summarise(mean_signal_intensity = mean(value)) %>%
+    inner_join(published_data, by = "uniprot_id") %>%
+    mutate(
+      Outcyte = replace_na(Outcyte, "NA"),
+      Outcyte = recode(Outcyte, !!!replace_list),
+      Outcyte = factor(Outcyte, levels = rev(names(palette)))
+    )
+  print(cor(
+    log2(df$published_concentration),
+    log2(df$mean_signal_intensity)
+  ))
+  lbl_df <- df %>% filter(alias %in% label_proteins)
+  print(df %>% filter(alias == "LRP1"))
+  plt <-
+    df %>% ggplot(aes(
+      x = log2(mean_signal_intensity),
+      y = log2(published_concentration),
+      fill = Outcyte,
+      size = Mass
+    )) +
+    geom_point(
+      shape = 21,
+      color = "black",
+      stroke = LINE_WIDTH,
+      alpha = 0.8
+    ) +
+    turboid_theme() +
+    theme(aspect.ratio = 1) +
+    scale_fill_manual(name = NULL, values = palette) +
+    scale_size_continuous(range = c(0.5, 4)) +
+    labs(
+      x = expression("log"[2] * "(mean signal intensity) basal plasma"),
+      y = expression("published plasma concentration log"[2] * "(pmol/mL)")
+    ) +
+    geom_text_repel(data = lbl_df, mapping = aes(label = alias), size = FONT_SIZE_MM, min.segment.length = 0, segment.size = LINE_WIDTH, box.padding = 1.5, max.overlaps = Inf)
+
+  print(plt)
+  save_plot(
+    fn = paste0("s3",fig_num,"_correlation", experiment),
+    ht = 2,
+    wd = 4
+  )
+}
+
+exps <- c("a"= "20221129_EV1_136", "b" = "20221130_EV1_137")
+
+abundance_scatterplot(
+  "20221129_EV1_136", label_proteins = c("APOA1","C5","CFH","FA5","MASP1","TRFE","FA9","ADIPO"), fig_num = "d"
+)
+
+abundance_scatterplot(
+  "20221130_EV1_137", label_proteins = c("LRP1","ADIPO","CFD","TGFB1","TSP4"), fig_num = "c"
+)
+```
+
+## 3G: Upset Plot
+
+```{r, fig.height=2.5, fig.width=3}
+library(patchwork)
+library(ComplexUpset)
+library(ggplot2)
+
+sets <- list(
+  `Hepatocyte serum` = read_experiment("20221129_EV1_136", "serum") %>% pull(uniprot_id),
+  `Adipocyte serum` = read_experiment("20221130_EV1_137", "serum") %>% pull(uniprot_id),
+  `Hepatocyte tissue` = read_experiment("20220714_EV1_98", "tissue") %>% pull(uniprot_id),
+  `Adipocyte tissue` = read_experiment("20220807_EV1_101", "tissue") %>% pull(uniprot_id)
+)
+
+fasta_table <-
+  "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Mass-spectrometry-datasets/03_results/03_fasta_table_tp_fp/main_fasta_table_without_signal_p.csv" %>%
+  read_csv() %>%
+  select(uniprot_id, Outcyte, Mass)
+
+# binary data frame
+all_elements <- unique(unlist(sets))
+df <- as.data.frame(sapply(sets, function(set) {
+  all_elements %in% set
+}))
+df <- cbind(element = all_elements, df) %>%
+  rename(c("uniprot_id" = "element")) %>%
+  left_join(fasta_table, by = "uniprot_id") %>%
+  mutate(Mass = as.numeric(Mass)) %>%
+  mutate(
+    Outcyte = replace_na(Outcyte, "NA"),
+    Outcyte = recode(Outcyte, !!!replace_list),
+    Outcyte = factor(Outcyte, levels = rev(names(palette)))
+  )
+upset_plot_theme <-
+  theme_classic() +
+  theme(
+    axis.text.y = TEXT_ELEMENT,
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.y = TEXT_ELEMENT,
+    panel.grid = element_blank(),
+    axis.line.x = AXIS_LINE,
+    axis.line.y = AXIS_LINE
+  )
+
+upset(
+  df,
+  sort_sets = FALSE,
+  intersect = names(sets),
+  set_sizes = FALSE,
+  matrix = (intersection_matrix(
+    geom = geom_point(
+      size = 1
+    ),
+    segment = geom_segment(
+      linewidth = LINE_WIDTH
+    )
+  )),
+  annotations = list(
+    "intersection size" = intersection_size(
+      counts = TRUE,
+      #mapping = aes(fill = POINT_FILL),
+      fill = POINT_FILL,
+      color = "black",
+      size = LINE_WIDTH,
+      show.legend = FALSE,
+      width = 0.7,
+      text = list(size = FONT_SIZE_MM, color = "black", family = FONT_FAMILY, vjust = -0.1, check_overlap = TRUE)
+    ) +
+      scale_fill_manual(values = palette, name = NULL) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.2)))
+  ),
+  base_annotations = list("% of proteins" = list(
+    aes = aes(x = intersection, fill = Outcyte),
+    geom = list(
+      geom_bar(
+        stat = "count",
+        position = "fill",
+        color = "black",
+        size = LINE_WIDTH,
+        show.legend = FALSE,
+        width = 0.7
+      ),
+      scale_fill_manual(values = palette, name = NULL),
+      scale_y_continuous(expand = expansion(mult = c(0, 0)), labels = scales::percent_format(accuracy = 1, suffix = ""), breaks = c(0, 0.5, 1))
+    )
+  )),
+  stripes = "white",
+  min_size = 10,
+  themes = list(
+    `% of proteins` = upset_plot_theme + theme(axis.ticks.y = AXIS_LINE),
+    `intersection size` = upset_plot_theme + theme(axis.ticks.y = AXIS_LINE),
+    intersections_matrix = upset_plot_theme + theme(axis.line.x = element_blank(), axis.line.y = element_blank(), axis.title.y = element_blank()),
+    overall_sizes = upset_plot_theme + theme(axis.text.x = TEXT_ELEMENT, axis.title.y = element_blank(), axis.text.y = element_blank(), axis.line.y = element_blank(), axis.ticks.x = AXIS_LINE)
+  )
+) + patchwork::plot_layout(heights = c(1, 0.4, 0.4))
+save_plot("s3c_upset_plot", ht = 2.5, wd = 4)
+```
+
+```{r, fig.height=2.5, fig.width=4}
+library(patchwork)
+upset_plot_theme <-
+  theme_classic() +
+  theme(
+    axis.text.y = TEXT_ELEMENT,
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.y = TEXT_ELEMENT,
+    panel.grid = element_blank(),
+    axis.line.x = AXIS_LINE,
+    axis.line.y = AXIS_LINE
+  )
+
+upset(
+  df,
+  sort_sets = FALSE,
+  intersect = names(sets),
+  set_sizes = FALSE, # (
+  #        upset_set_size(
+  #           geom=geom_bar(
+  #                aes(fill=Outcyte, x=group),
+  #                width=0.6,
+  #                color = "black",
+  #                size = LINE_WIDTH,
+  #                show.legend = FALSE
+  #            ),
+  #            position='right'
+  #        )+ scale_fill_manual(values = palette) + scale_y_continuous(breaks = c(0,1500))
+  #    ),
+  matrix = (intersection_matrix(
+    geom = geom_point(
+      size = 1
+    ),
+    segment = geom_segment(
+      linewidth = LINE_WIDTH
+    )
+  )),
+  base_annotations = list(
+    "Intersection" = intersection_size(
+      counts = TRUE,
+      mapping = aes(fill = Outcyte),
+      color = "black",
+      size = LINE_WIDTH,
+      show.legend = FALSE,
+      width = 0.7,
+      text = list(size = FONT_SIZE_MM, color = "black", family = FONT_FAMILY, vjust = -0.1, check_overlap = TRUE)
+    ) +
+      scale_fill_manual(values = palette, name = NULL) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.2)))
+  ),
+  min_size = 10,
+  stripes = "white",
+  themes = list(
+    `% of proteins` = upset_plot_theme + theme(axis.ticks.y = AXIS_LINE),
+    `Intersection` = upset_plot_theme + theme(axis.ticks.y = AXIS_LINE),
+    intersections_matrix = upset_plot_theme + theme(axis.line.x = element_blank(), axis.line.y = element_blank(), axis.title.y = element_blank()),
+    overall_sizes = upset_plot_theme + theme(axis.text.x = TEXT_ELEMENT, axis.title.y = element_blank(), axis.text.y = element_blank(), axis.line.y = element_blank(), axis.ticks.x = AXIS_LINE)
+  )
+) + patchwork::plot_layout(heights = c(1, 0.2))
+save_plot("3g_upset_plot", ht = 2.5, wd = 4)
+```
+
+## 3F: dot plot
+
+```{r, fig.height=3, fig.width=3.8}
+fold_change_dot_plot <- function(highlight_genes) {
+  df <- dep_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(comparison %in% c("LPS vs. basal", "fast vs. basal"))
+
+  df <- df %>%
+    mutate(`Entry Name` = entry_name) %>%
+    add_alias() %>%
+    filter(grepl("EV1_137|EV1_101|EV1_136|EV1_98", experiment)) %>%
+    mutate(tissue = case_when(
+      grepl("EV1_136|EV1_98", experiment) ~ "Hepatocyte",
+      TRUE ~ "Adipocyte"
+    )) %>%
+    filter(alias %in% highlight_genes) %>%
+    mutate(
+      comparison = str_split(comparison, " vs. ") %>% map_chr(1),
+      comparison = recode(comparison, !!!c("fast" = "Fasting")),
+      alias = factor(alias, levels = rev(highlight_genes)),
+      group = paste(tissue, sample_type),
+      group = factor(
+        group,
+        levels = c(
+          "Adipocyte tissue",
+          "Hepatocyte tissue",
+          "Adipocyte serum",
+          "Hepatocyte serum"
+        )
+      )
+    )
+  print(nrow(df))
+  plt <- df %>% 
+    arrange(alias) %>%
+    ggplot(aes(
+    x = comparison,
+    y = alias,
+    fill = log2_FC,
+    size = `-log10_pval`
+  )) +
+    geom_point(shape = 21, stroke = LINE_WIDTH) +
+    facet_wrap(
+      ~group,
+      nrow = 1,
+      labeller = label_wrap_gen(multi_line = FALSE),
+      strip.position = "bottom"
+    ) +
+    turboid_theme() +
+    theme(
+      panel.spacing.x = unit(0, "mm"),
+      panel.grid.major = element_line(color = "grey", linewidth = LINE_WIDTH),
+      strip.placement = "outside",
+      legend.position = "bottom",
+      legend.key.height = unit(3, "mm"),
+      legend.key.width = unit(4, "mm")
+    ) +
+    scale_fill_gradient2(
+      high = "red",
+      low = "blue",
+      mid = "white",
+      limits = c(-3, 3),
+      oob = squish,
+      name = expression("log"[2] * "(FC from basal)")
+    ) +
+    scale_size_continuous(
+      range = c(1, 4),
+      name = expression("log"[2] * "(p-value)")
+    ) +
+    labs(x = NULL, y = NULL)
+  print(plt)
+  save_plot("3f_dot_plot", ht = 3, wd = 3.8)
+  return(df)
+}
+
+old_highlight_genes <- c("CHLE","LIFR","C6","APOA1","C3","HPT","LPL","SERPINA3N","PLTP","APOE","SPA3M","A1AT5","ENPP2","C1S1","CBPQ","PZP","LBP","APOA4","KLKB1","MBL2","CBG","THBG","GRN","IBP4","HEMO","SAA1","ITIH4","SAA2","FGL1","RETN")
+
+new_highlight_genes <- c("A1AT5","C1S1","C6","BCHE","LIFR","MBL2","KLKB1","LPL","LBP","PZP","APOE","C3","HEMO","HP","SAA1","SERPINA3N","APOA4","SERPINA3M")
+df <- fold_change_dot_plot(
+  highlight_genes =new_highlight_genes
+)
+
+```
+
+## S3E correlation plots
+
+```{r}
+s3_d_g <- c("G6PE")
+
+s3_d <- c(s3_d_g, c('PTER', 'GPAT3', 'CDNF', 'SAA2', 'CNPY2', 'FBLN3', 'FAM20C', 'HEPH', 'SPRC', 'FKBP5', 'SERPINA3N', 'MATN2', 'PLIN4', 'GBP2', 'EST1', 'SAA1', 'MYADM', 'STEA4', 'TGFB1', 'NPC2', 'CES1D', 'SERPINA3C', 'THRSP', 'CP7A1'))
+
+s3_e <- c(s3_d_g, c('SERPINA3C', 'PLIN1', 'PLIN4', 'CLC11', 'GAS6', 'TSP2', 'LDLR', 'AMPE', 'MYADM', 'SPRC', 'LIFR'))
+
+s3_f <- c(s3_d_g, c('PLIN1', 'PLIN4', 'ANXA1', 'CDNF', 'ANGL2', 'ERLN1', 'NAMPT', 'SAA1', 'LDLR', 'PODN', 'HFE', 'CATD', 'PCSK6', 'AMPE', 'SPRC', 'ERLN2', 'NENF', 'SERPINA3N'))
+
+s3_g <- c(s3_d_g, c('TSP2'))
+```
+
+```{r, fig.height=4, fig.width=2}
+# hepatocyte
+correlation_min <- -5
+correlation_max <- 6.4
+
+
+# liver vs plasma LPS stimulation
+correlation_plot(
+  timepoints = c(
+    "x" = "20220714_EV1_98", # x is liver
+    "y" = "20221129_EV1_136" # y is plasma
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "serum"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "liver 15w p < 0.05" = "#d6e5b3",
+    "plasma 15w p < 0.05" = "#75c489",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#5d8f70"
+  ),
+  num_top = 5,
+  x_lab = expression("liver, log"[2] * "(LPS/basal)"),
+  y_lab = expression("plasma, log"[2] * "(LPS/basal)"),
+  drop = "fast"#,
+  #top = s3_d
+)
+
+save_plot(
+  fn = "s3d",
+  wd = 2,
+  ht = 4
+)
+
+# liver vs plasma LPS stimulation
+correlation_plot(
+  timepoints = c(
+    "x" = "20220714_EV1_98", # x is liver
+    "y" = "20221129_EV1_136" # y is plasma
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "serum"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "liver 15w p < 0.05" = "#c4dfec",
+    "plasma 15w p < 0.05" = "#85c6ed",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#4482c3"
+  ),
+  num_top = 5,
+  x_lab = expression("liver, log"[2] * "(fast/basal)"),
+  y_lab = expression("plasma, log"[2] * "(fast/basal)"),
+  drop = "LPS"#,
+  #top = s3_e
+)
+
+save_plot(
+  fn = "s3e",
+  wd = 2,
+  ht = 4
+)
+
+# adipocyte
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20220807_EV1_101", # x is liver
+    "y" = "20221130_EV1_137" # y is plasma
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "serum"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "iWAT 15w p < 0.05" = "#d6e5b3",
+    "plasma 15w p < 0.05" = "#75c489",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#5d8f70"
+  ),
+  num_top = 5,
+  x_lab = expression("iWAT, log"[2] * "(LPS/basal)"),
+  y_lab = expression("plasma, log"[2] * "(LPS/basal)"),
+  drop = "fast"#,
+  #top = s3_f
+)
+
+save_plot(
+  fn = "s3f",
+  wd = 2,
+  ht = 4
+)
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20220807_EV1_101", # x is liver
+    "y" = "20221130_EV1_137" # y is plasma
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "serum"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "iWAT 15w p < 0.05" = "#c4dfec",
+    "plasma 15w p < 0.05" = "#85c6ed",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#4482c3"
+  ),
+  num_top = 5,
+  x_lab = expression("iWAT, log"[2] * "(fast/basal)"),
+  y_lab = expression("plasma, log"[2] * "(fast/basal)"),
+  drop = "LPS"#,
+  #top = s3_g
+)
+
+save_plot(
+  fn = "s3g",
+  wd = 2,
+  ht = 4
+)
+```
+
+# Figure 4
+
+## S4I: Volcano plot
+
+```{r}
+# read mass spec data
+# transform multiple pipeline outputs into a tidy dataframe
+file_paths <- list(
+  "iWAT" = "20240427_CRW_B17A",
+  "eWAT" = "20240429_CRW_B17B"
+)
+df <- imap_dfr(file_paths, ~
+  read_experiment(.x, sample_type = "tissue") %>%
+    dplyr::rename(protein = `Entry Name`, gene = gene_name) %>%
+    dplyr::select(protein, gene, contains("iWAT_HFD vs. iWAT_chow"), contains("eWAT_HFD vs. eWAT_chow")) %>%
+    mutate(tissue = .y))
+
+# tidy column names
+for (col in c("Regulation", "-log10_pval", "log2_FC")) {
+  for (comparison in c("iWAT_HFD vs. iWAT_chow", "eWAT_HFD vs. eWAT_chow")) {
+    df <- df %>%
+      mutate(!!paste0(col, ";", comparison) := coalesce(!!!dplyr::select(., contains(col) &
+        contains(comparison))))
+  }
+}
+print(df)
+
+df <- df %>%
+  dplyr::select(-ends_with(")")) %>%
+  pivot_longer(
+    cols = starts_with("Regulation") |
+      starts_with("-log10_pval") | starts_with("log2_FC"),
+    names_to = c(".value", "comparison"),
+    names_sep = ";"
+  ) %>%
+  mutate(group = Regulation, log2FC = log2_FC, comparison = "HFD") %>%
+  mutate(`Entry Name` = protein) %>%
+  add_alias()
+
+df
+```
+
+## S4J GO term
+
+```{r, fig.width=1.5, fig.height=1.2}
+facetted_go_term(
+  file_paths = list(
+    "iWAT" = "20240427_CRW_B17A",
+    "eWAT" = "20240429_CRW_B17B"
+  ),
+  comparison_1 = "iWAT_HFD vs. iWAT_chow",
+  comparison_2 = "eWAT_HFD vs. eWAT_chow",
+  filter_direction = TRUE
+)
+
+save_plot(
+  "s4j_go_term",
+  ht = 1.2,
+  wd = 1.5
+)
+```
+
+## concat heatmap
+
+```{r}
+go_term_name <- "protein folding"
+# gt <- get_study_genes(go_term_name)
+# gt <- c("Fgb","Fgg","C3","C4b","Fga","Apoa1","C6","Stat1","Apcs","Apoa4","Tfrc","Pml","Hp","Rbp4")
+# gt <- c("Itgb1","Col18a1","St3gal4","Sorbs3","Slc4a1","Itgb5","Fndc3b","Siglec1","Ptprd","Gpc4","Dmd","Tgm2","Afdn","Parva")
+df2 <- read_experiment("20240427_CRW_B17A", "tissue") %>%
+  filter(gene_name %in% gt) %>%
+  prepare_fc_data("chow")
+rownames(df2) <- paste("iWAT", rownames(df2))
+df1 <- read_experiment("20240429_CRW_B17B", "tissue") %>%
+  filter(gene_name %in% gt) %>%
+  prepare_fc_data("chow")
+rownames(df1) <- paste("eWAT", rownames(df1))
+df2 <- df2[, colnames(df2)[colnames(df2) %in% colnames(df1)]]
+df1 <- df1[, colnames(df2)]
+mat <- rbind(df1, df2)
+
+pdf(
+  file = paste0(paste0("s4j_heatmap_", go_term_name, ".pdf")),
+  width = 3,
+  height = 1.8
+)
+
+mat %>% fc_heatmap(output_filename = "aa", labels = c("HFD"), group_colors = c("#faa41a"), control_name = "chow")
+
+lbl_gp <- gpar(col = "black", fontsize = 6, rot = 0, fontfamily = FONT_FAMILY)
+group_block_anno(c(1), "empty", gp = gpar(fill = "grey90", col = "white"), label = "iWAT", label_gp = lbl_gp)
+group_block_anno(c(2), "empty", gp = gpar(fill = "grey90", col = "white"), label = "eWAT", label_gp = lbl_gp)
+dev.off()
+```
+
+### heatamp
+
+Make heatmaps of the fold change of protein folding proteins in iWAT and
+eWAT in mice on HFD vs chow diet
+
+```{r, fig.height=1, fig.width=3}
+read_experiment("20240427_CRW_B17A", "tissue") %>%
+  filter(gene_name %in% get_study_genes("protein folding")) %>%
+  prepare_fc_data("chow", filter_to_sig = TRUE) %>%
+  fc_heatmap(output_filename = "s4j_fc_heatmap_iWAT.pdf", width = 3, height = 1, control_name = "chow", group_colors = c("#faa41a"), labels = c("HFD iWAT"), n_cell_types = 1, col_name_rot = 90)
+
+read_experiment("20240429_CRW_B17B", "tissue") %>%
+  filter(gene_name %in% get_study_genes("protein folding")) %>%
+  prepare_fc_data("chow", filter_to_sig = TRUE) %>%
+  fc_heatmap(output_filename = "s4j_fc_heatmap_eWAT.pdf", width = 3, height = 1, control_name = "chow", group_colors = c("#faa41a"), labels = c("HFD eWAT"), n_cell_types = 1, col_name_rot = 90)
+```
+
+## S4J go term
+
+```{r, fig.width=2.1, fig.height=2.6}
+file_paths <- list("a" = "20240907_CRW_B25A", "a" = "20240909_CRW_B25B")
+
+facetted_go_term(file_paths,
+  comparison_1 = "iWAT_HFD vs. iWAT_chow",
+  comparison_2 = "eWAT_HFD vs. eWAT_chow"
+)
+
+save_plot(
+  "4j_go_term",
+  ht = 2.6,
+  wd = 2.1
+)
+df <- paste0(PIPELINE_RESULTS_PATH, "turboid_go_term_analysis_ref_list.csv") %>%
+  read_csv(show_col_types = FALSE) %>%
+  filter(
+    # filter to relevant results
+    experiment %in% file_paths
+  )
+
+unique(df$comparison)
+```
+
+## Heatmap
+
+```{r, fig.width=2.5, fig.height=5.5}
+read_experiment("20240427_CRW_B17A", "tissue") %>%
+  filter(gene_name %in% get_study_genes("inflammatory response")) %>%
+  fc_heatmap(output_filename = "6d_fc_heatmap.pdf", width = 2.2, height = 3.8, control_name = "chow", group_colors = c("#faa41a"))
+
+
+read_experiment("20240909_CRW_B25B", "tissue") %>%
+  filter(gene_name %in% get_study_genes("inflammatory response")) %>%
+  fc_heatmap(output_filename = "6d_fc_heatmap.pdf", width = 2.2, height = 3.8, control_name = "iWAT", group_colors = c("#faa41a"))
+```
+
+## 4J Volcano plot
+
+```{r, fig.height=4, fig.width=4.5}
+
+highlight_proteins <- "reference_data/Volcano plot proteins to highlight - Sheet1.csv" %>%
+  read_csv(show_col_types = FALSE) %>%
+  mutate(key = paste(protein, tissue, comparison, sep = "_")) %>%
+  pull(key)
+# read mass spec data
+# transform multiple pipeline outputs into a tidy dataframe
+comparisons <- c("eWAT_HFD vs. eWAT_chow", "iWAT_HFD vs. iWAT_chow")
+file_paths <- list("iWAT_HFD" = "20240907_CRW_B25A", "eWAT_HFD" = "20240909_CRW_B25B")
+#file_paths <- list(
+#  "iWAT_HFD" = "20240427_CRW_B17A",
+#  "eWAT_HFD" = "20240429_CRW_B17B"
+#)
+df <- imap_dfr(file_paths, ~
+  read_experiment(.x, sample_type = "tissue") %>%
+    dplyr::select(`Entry Name`, gene_name, contains(comparisons[1]), contains(comparisons[2])) %>%
+    mutate(tissue = .y))
+
+# tidy column names
+for (col in c("Regulation", "-log10_pval", "log2_FC")) {
+  for (comparison in comparisons) {
+    df <- df %>%
+      mutate(!!paste0(col, ";", comparison) := coalesce(!!!dplyr::select(., contains(col) &
+        contains(comparison))))
+  }
+}
+print(unique(df$comparison))
+df <- df %>%
+  dplyr::select(-ends_with(")")) %>%
+  pivot_longer(
+    cols = starts_with("Regulation") |
+      starts_with("-log10_pval") | starts_with("log2_FC"),
+    names_to = c(".value", "comparison"),
+    names_sep = ";"
+  ) %>%
+  mutate(group = Regulation, log2FC = log2_FC, comparison = case_when(comparison == "eWAT_HFD vs. iWAT_HFD" ~ "HFD", TRUE ~ "HFD")) %>%
+  add_alias() %>%
+  mutate(tissue = case_when(tissue %in% c("iWAT_HFD") ~ "iWAT", TRUE ~ "eWAT"))
+
+print(unique(df$tissue))
+print(unique(df$comparison))
+# build a annotation dataframe iteratively
+rows <- list()
+for (comp in unique(df$comparison)) {
+  for (mouse_tissue in unique(df$tissue)) {
+    n_up <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Up"
+      ) %>%
+      nrow()
+    up_row <- data.frame(
+      text = paste(n_up, "up \nin", mouse_tissue, comp, " "),
+      x_pos = Inf,
+      hjustvar = 1,
+      proteins = n_up,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    n_down <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Down"
+      ) %>%
+      nrow()
+    down_row <- data.frame(
+      text = paste(" ", n_down, "down\n. in", mouse_tissue, comp),
+      x_pos = -Inf,
+      hjustvar = -0,
+      proteins = n_down,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    rows <- append(rows, list(up_row, down_row))
+  }
+}
+annotation_df <- bind_rows(rows)
+
+label_df <-
+  df %>%
+  mutate(key = paste(alias, tissue, comparison, sep = "_")) %>%
+  filter(key %in% highlight_proteins, Regulation %in% c("Significant Up", "Significant Down"))
+print(df)
+print("APOA4" %in% label_df$alias)
+print("APOA4" %in% df$alias)
+x_lim <- max(abs(df$log2_FC), na.rm = TRUE)
+
+df %>%
+  mutate(Regulation = factor(Regulation, levels = names(REGULATION_COLORS)), tissue = factor(tissue, levels = c("eWAT", "iWAT"))) %>%
+  arrange(Regulation) %>%
+  volcano_plot_base(
+    params = list(
+      stroke = LINE_WIDTH,
+      show_legend = FALSE,
+      palette = REGULATION_COLORS, alpha_palette = ALPHA_PALETTE
+    ),
+    left_annotation = "",
+    right_annotation = ""
+  ) +
+  geom_text(
+    data = annotation_df,
+    aes(
+      x = x_pos,
+      y = Inf,
+      hjust = hjustvar,
+      vjust = 1.25,
+      label = text
+    ),
+    inherit.aes = FALSE,
+    size = FONT_SIZE_MM,
+    fontface = "italic",
+    lineheight = 0.95
+  ) +
+  geom_text_repel(data = label_df %>% filter(log2_FC > 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = 5.5 * 0.352778, xlim = c(1.5, x_lim), nudge_x = 1, nudge_y = 1, segment.color = "grey70") +
+  geom_text_repel(data = label_df %>% filter(log2_FC < 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = 5.5 * 0.352778, xlim = c(-x_lim, 1.5), nudge_x = -1, nudge_y = 1, segment.color = "grey70") +
+  facet_grid(cols = vars(tissue), axes = "all", axis.labels = "all") +
+  theme(strip.text.y = TEXT_ELEMENT) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0)), limits = c(-x_lim, x_lim)) +
+  ylim(0, max(df$`-log10_pval`, na.rm = TRUE) + 1) +
+  xlab(expression("log"[2] * "(fold-change)"))
+#save_plot(fn = "5a_volcano_plots", ht = 4.5, wd = 4.5)
+
+max(df$`-log10_pval`, na.rm = TRUE) + 2
+
+save_plot(
+  "4jk_volcano",
+  wd = 4.5,
+  ht = 4
+)
+
+dep_path %>%
+  read_csv() %>%
+  filter(uniprot_id == "O88495")
+```
+
+```{r}
+df %>% filter(gene_name == "Gpr50")
+```
+
+# Figure 5
+
+## Volcano plot
+
+```{r}
+# read mass spec data
+# transform multiple pipeline outputs into a tidy dataframe
+file_paths <- list(
+  "6W_chow" = "20240430_CRW_B17C",
+  "6W_HFD" = "20240501_CRW_B17D",
+  "15W_chow" = "20240911_CRW_B25C",
+  "15W_HFD" = "20240915_CRW_B25D"
+)
+df <- imap_dfr(file_paths, ~
+  read_experiment(.x, sample_type = "tissue") %>%
+    dplyr::select(`Entry Name`, gene_name, contains("eWAT_HFD vs. iWAT_HFD"), contains("eWAT_chow vs. iWAT_chow")) %>%
+    mutate(tissue = .y))
+
+# tidy column names
+for (col in c("Regulation", "-log10_pval", "log2_FC")) {
+  for (comparison in c("eWAT_HFD vs. iWAT_HFD", "eWAT_chow vs. iWAT_chow")) {
+    df <- df %>%
+      mutate(!!paste0(col, ";", comparison) := coalesce(!!!dplyr::select(., contains(col) &
+        contains(comparison))))
+  }
+}
+print(unique(df$comparison))
+df <- df %>%
+  dplyr::select(-ends_with(")")) %>%
+  pivot_longer(
+    cols = starts_with("Regulation") |
+      starts_with("-log10_pval") | starts_with("log2_FC"),
+    names_to = c(".value", "comparison"),
+    names_sep = ";"
+  ) %>%
+  mutate(group = Regulation, log2FC = log2_FC, comparison = case_when(comparison == "eWAT_HFD vs. iWAT_HFD" ~ "HFD", TRUE ~ "chow")) %>%
+  add_alias() %>%
+  mutate(tissue = case_when(tissue %in% c("6W_chow", "6W_HFD") ~ "6W", TRUE ~ "15W")) %>%
+  mutate(tissue = factor(tissue, levels = rev(c("6W", "15W"))))
+
+# build a annotation dataframe iteratively
+rows <- list()
+for (comp in unique(df$comparison)) {
+  for (mouse_tissue in unique(df$tissue)) {
+    n_up <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Up"
+      ) %>%
+      nrow()
+    up_row <- data.frame(
+      text = paste(n_up, "upregulated \nin", mouse_tissue, comp, "eWAT", " "),
+      x_pos = Inf,
+      hjustvar = 1,
+      proteins = n_up,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    n_down <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Down"
+      ) %>%
+      nrow()
+    down_row <- data.frame(
+      text = paste(" ", n_down, "downregulated\n. in", mouse_tissue, comp, "eWAT"),
+      x_pos = -Inf,
+      hjustvar = -0,
+      proteins = n_down,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    rows <- append(rows, list(up_row, down_row))
+  }
+}
+annotation_df <- bind_rows(rows)
+
+label_df <-
+  df %>%
+  mutate(key = paste(alias, tissue, comparison, sep = "_")) %>%
+  filter(key %in% highlight_proteins, Regulation %in% c("Significant Up", "Significant Down"))
+print(df)
+
+x_lim <- max(abs(df$log2_FC))
+
+df %>%
+  mutate(Regulation = factor(Regulation, levels = names(REGULATION_COLORS))) %>%
+  arrange(Regulation) %>%
+  arrange(tissue) %>%
+  volcano_plot_base(
+    params = list(
+      stroke = LINE_WIDTH,
+      show_legend = FALSE,
+      palette = REGULATION_COLORS, alpha_palette = ALPHA_PALETTE
+    ),
+    left_annotation = "",
+    right_annotation = ""
+  ) +
+  geom_text(
+    data = annotation_df,
+    aes(
+      x = x_pos,
+      y = Inf,
+      hjust = hjustvar,
+      vjust = 1.25,
+      label = text
+    ),
+    inherit.aes = FALSE,
+    size = FONT_SIZE_MM,
+    fontface = "italic",
+    lineheight = 0.95
+  ) +
+  geom_text_repel(data = label_df %>% filter(log2_FC > 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = FONT_SIZE_MM, xlim = c(1.5, x_lim), nudge_x = 1, nudge_y = 1) +
+  geom_text_repel(data = label_df %>% filter(log2_FC < 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = FONT_SIZE_MM, xlim = c(-x_lim, 1.5), nudge_x = -1, nudge_y = 1) +
+  facet_grid(cols = vars(tissue), rows = vars(comparison), axes = "all", axis.labels = "all") +
+  xlim(-x_lim, x_lim) +
+  ylim(0, max(df$`-log10_pval`, na.rm = TRUE) + 1) +
+  xlab(expression("log"[2] * "(fold-change)")) +
+  theme(strip.text.y = TEXT_ELEMENT)
+save_plot(fn = "5a_volcano_plots", ht = 4.5, wd = 4.5)
+
+max(df$`-log10_pval`, na.rm = TRUE) + 2
+```
+
+## 5F: GO term enrichment
+
+```{r, fig.width=2.1, fig.height=3.1}
+facetted_go_term(
+  file_paths = list(
+    "6W" = "20240430_CRW_B17C",
+    "6W" = "20240501_CRW_B17D",
+    "15W" = "20240911_CRW_B25C",
+    "15W" = "20240915_CRW_B25D"
+  ),
+  comparison_1 = "eWAT_HFD vs. iWAT_HFD",
+  comparison_2 = "eWAT_chow vs. iWAT_chow",
+  go_class = "biological_process"
+)
+
+save_plot(
+  fn = "5b_go_term",
+  wd = 2.6,
+  ht = 3.1
+)
+```
+
+```{r, fig.width=2.6, fig.height=7}
+# build a annotation dataframe iteratively
+rows <- list()
+for (comp in unique(df$comparison)) {
+  for (mouse_tissue in unique(df$tissue)) {
+    print(mouse_tissue)
+    # tissue_name = case_when(mouse_tissue == "Hepatocytes" ~ "liver", TRUE ~ "fat")
+    n_up <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Up"
+      ) %>%
+      nrow()
+    up_row <- data.frame(
+      text = paste(n_up, "upregulated \nin", comp, mouse_tissue, " "),
+      x_pos = Inf,
+      hjustvar = 1,
+      proteins = n_up,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    n_down <- df %>%
+      filter(
+        comparison == comp,
+        tissue == mouse_tissue,
+        Regulation == "Significant Down"
+      ) %>%
+      nrow()
+    down_row <- data.frame(
+      text = paste(" ", n_down, "downregulated\n. in", comp, mouse_tissue),
+      x_pos = -Inf,
+      hjustvar = -0,
+      proteins = n_down,
+      tissue = mouse_tissue,
+      comparison = comp
+    )
+    rows <- append(rows, list(up_row, down_row))
+  }
+}
+annotation_df <- bind_rows(rows)
+
+label_df <-
+  df %>%
+  mutate(key = paste(alias, tissue, comparison, sep = "_")) %>%
+  filter(key %in% highlight_proteins, Regulation %in% c("Significant Up", "Significant Down"))
+print(df)
+
+x_lim <- max(abs(df$log2_FC))
+
+df %>%
+  mutate(Regulation = factor(Regulation, levels = names(REGULATION_COLORS))) %>%
+  arrange(Regulation) %>%
+  volcano_plot_base(
+    params = list(
+      stroke = LINE_WIDTH,
+      show_legend = FALSE,
+      palette = REGULATION_COLORS, alpha_palette = ALPHA_PALETTE
+    ),
+    left_annotation = "",
+    right_annotation = ""
+  ) +
+  geom_text(
+    data = annotation_df,
+    aes(
+      x = x_pos,
+      y = Inf,
+      hjust = hjustvar,
+      vjust = 1.25,
+      label = text
+    ),
+    inherit.aes = FALSE,
+    size = FONT_SIZE_MM,
+    fontface = "italic",
+    lineheight = 0.95
+  ) +
+  geom_text_repel(data = label_df %>% filter(log2_FC > 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = FONT_SIZE_MM, xlim = c(1.5, x_lim), nudge_x = 1, nudge_y = 1) +
+  geom_text_repel(data = label_df %>% filter(log2_FC < 0), mapping = aes(label = alias), min.segment.length = 0, segment.size = LINE_WIDTH, max.overlaps = Inf, size = FONT_SIZE_MM, xlim = c(-x_lim, 1.5), nudge_x = -1, nudge_y = 1) +
+  facet_grid(rows = vars(tissue), cols = vars(comparison), axes = "all", axis.labels = "all", scales = "free") +
+  xlim(-x_lim, x_lim) +
+  ylim(0, (max(df$`-log10_pval`, na.rm = TRUE) + 1)) +
+  xlab(expression("log"[2] * "(fold-change)")) +
+  theme(strip.text.y = TEXT_ELEMENT)
+save_plot(fn = "4i_volcano_plots", ht = 7, wd = 2.6)
+```
+
+## 5G,H go-term correlation plot
+
+```{r, fig.width=2.2635, fig.height=4}
+get_study_genes <- function(go_term_name) {
+  # helper method to pull a list of
+  # genes related to a GO term
+  study_genes <- go_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(term == go_term_name) %>%
+    mutate(gene_list = str_extract_all(study_genes, "'[^']+'") %>%
+      map(~ str_remove_all(.x, "'"))) %>%
+    tidyr::unnest_longer(col = gene_list) %>%
+    pull(gene_list) %>%
+    unique()
+  return(study_genes)
+}
+
+go_term_correlation <- function(file_paths, cell_type = "Hepatocytes", upper_limit = 6.4, lower_limit = -2.8, fn = "2i_correlation_plot", label_genes = c()) {
+  # pull a list of immune process genes
+  go_term_name_1 <- "immune system process"
+  go_term_name_2 <- "cell adhesion"
+
+  alpha_palette <- c(
+    setNames(0.6, go_term_name_1),
+    setNames(0.6, go_term_name_2),
+    both = 0.7,
+    other = 0.4
+  )
+
+  fill_palette <- c(
+    setNames("#0D0887FF", go_term_name_2),
+    setNames("#CC4678FF", go_term_name_1),
+    both = "#edb180",
+    other = "grey80"
+  )
+
+  color_palette <- c(
+    setNames("#0D0887FF", go_term_name_2),
+    setNames("#CC4678FF", go_term_name_1),
+    both = "#edb180",
+    other = "black"
+  )
+
+  study_genes_1 <- get_study_genes(go_term_name_1)
+  study_genes_2 <- get_study_genes(go_term_name_2)
+
+  # make a correlation plot
+
+  dep_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(
+      experiment %in% file_paths,
+      comparison %in% c("eWAT_chow vs. iWAT_chow", "eWAT_HFD vs. iWAT_HFD")
+    ) -> df
+  print(unique(df$experiment))
+  df %>%
+    pivot_wider(
+      id_cols = c(entry_name, gene_name),
+      values_from = log2_FC,
+      names_from = comparison
+    ) %>%
+    mutate(`Entry Name` = entry_name) %>%
+    add_alias() %>%
+    drop_na() %>%
+    mutate(
+      group =
+        case_when(
+          (gene_name %in% study_genes_1) & (gene_name %in% study_genes_2) ~ "both",
+          (gene_name %in% study_genes_1) ~ go_term_name_1,
+          (gene_name %in% study_genes_2) ~ go_term_name_2,
+          TRUE ~ "other"
+        )
+    ) %>%
+    arrange(desc(group)) -> df
+
+  plt <- df %>%
+    ggplot(aes(x = `eWAT_chow vs. iWAT_chow`, y = `eWAT_HFD vs. iWAT_HFD`, fill = group, alpha = group, color = group, label = alias)) +
+    geom_vline(xintercept = 0, size = LINE_WIDTH, color = "grey90") +
+    geom_hline(yintercept = 0, size = LINE_WIDTH, color = "grey90") +
+    geom_segment(
+      data = data.frame(),
+      mapping = aes(
+        x = c(lower_limit, lower_limit, lower_limit + 1),
+        y = c(lower_limit + 1, lower_limit, lower_limit),
+        xend = c(upper_limit - 1, upper_limit, upper_limit),
+        yend = c(upper_limit, upper_limit, upper_limit - 1),
+        linetype = c("dashed", "solid", "dashed")
+      ),
+      size = LINE_WIDTH,
+      inherit.aes = FALSE,
+      show.legend = FALSE
+    ) +
+    geom_point(
+      data = df,
+      shape = 21,
+      size = 1.7,
+      stroke = 0,
+      color = "black",
+      show.legend = TRUE
+    ) +
+    geom_text_repel(
+      data = df %>% filter(alias %in% label_genes),
+      size = FONT_SIZE_MM,
+      show.legend = FALSE,
+      # color = "black",
+      alpha = 1,
+      segment.size = LINE_WIDTH,
+      min.segment.length = 0,
+      family = FONT_FAMILY,
+      max.overlaps = Inf,
+    ) +
+    turboid_theme() +
+    ggtitle(paste0(
+      gsub("s", "", cell_type),
+      " HFD and chow\ntreatment correlation (",
+      format(nrow(df), big.mark = ",", scientific = FALSE),
+      " proteins)"
+    )) +
+    scale_fill_manual(
+      values = fill_palette,
+      name = NULL
+    ) +
+    scale_alpha_manual(
+      values = alpha_palette,
+      name = NULL
+    ) +
+    scale_color_manual(
+      values = color_palette,
+      name = NULL
+    ) +
+    guides(alpha = NULL, stroke = NULL, color = NULL, fill = guide_legend(nrow = 2)) +
+    labs(
+      x = expression("6w chow, log"[2] * "(eWAT/iWAT)"),
+      y = expression("6w HFD, log"[2] * "(eWAT/iWAT)")
+    ) +
+    theme(legend.position = "top", legend.byrow = TRUE, aspect.ratio = 1, legend.margin = margin(b = -15), legend.key = element_blank()) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0)), limits = c(lower_limit, upper_limit)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0)), limits = c(lower_limit, upper_limit)) +
+    scale_linetype_manual(values = c("dashed" = "dashed", "solid" = "solid"))
+
+  print(plt)
+
+  save_plot(fn, wd = 2.2635, ht = 4)
+  return(df)
+}
+
+
+go_term_correlation(file_paths = list(
+  "chow" = "20240430_CRW_B17C",
+  "HFD" = "20240501_CRW_B17D"
+), cell_type = "chow", upper_limit = 5, lower_limit = -6, fn = "5g_correlation_plot", label_genes = c("C3", "C1QC", "C1QB", "C1QA", "VAV", "MYH4", "MPZ", "CO6A5", "CO6A1", "CO6A2", "HHATL", "MCSP", "MYH1", "DTX3L"))
+
+go_term_correlation(file_paths = list("chow" = "20240911_CRW_B25C", "HFD" = "20240915_CRW_B25D"), cell_type = "chow", upper_limit = 5, lower_limit = -6, fn = "5h_correlation_plot", label_genes = c("C3", "C1QC", "C1QB", "C1QA", "VAV", "MYH4", "MPZ", "CO6A5", "CO6A1", "CO6A2", "HHATL", "MCSP", "MYH1", "DTX3L"))
+```
+
+## 5x correlation plot
+
+```{r, fig.height=4, fig.width=2}
+
+
+new_interdepot <- c("ANGPTL1",  "C1QA", "C1QB", "C1QC", "CATD", "HP", "PGDH", "THBS1","ADRB3" )
+
+
+iwat_hfd_6w <- "#f7941d"
+ewat_hfd_6w <- "#fede27"
+iwat_hfd_15w <- "#ef4136"
+ewat_hfd_15w <- "#9f1e37"
+both <- "#7E614899"
+
+number_proteins_to_label <- 5
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20240427_CRW_B17A",
+    "y" = "20240907_CRW_B25A"
+  ),
+  min = -8,
+  max = 5.5,
+  sample_type = c("x" = "tissue", "y" = "tissue"),
+  num_top = number_proteins_to_label,
+  correlation_palette = c(
+    "iWAT 6w p < 0.05" = iwat_hfd_6w,
+    "iWAT 15w p < 0.05" = iwat_hfd_15w,
+    "Not significant" = not_significant,
+    "Both p < 0.05" = both
+  ),
+  x_lab = expression("iWAT 6w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("iWAT 15w, log"[2] * "(HFD/chow)"),
+  drop = "blank",
+  top = c(c('PPIC', 'NENF', 'PLIN1', 'MANF', 'LPL', 'LEP', 'CFD', 'SERPINF1', 'SYUG', 'FAM20C', 'PLIN4', 'APOA4', 'CDNF', 'G6PE', 'PLTP', 'APOE', 'LDLR', 'PAM'), new_interdepot)
+)
+save_plot("5d_correlation_plot",
+  wd = 2,
+  ht = 4
+)
+```
+
+```{r, fig.height=4, fig.width=2}
+correlation_plot(
+  timepoints = c(
+    "x" = "20240429_CRW_B17B",
+    "y" = "20240909_CRW_B25B"
+  ),
+  min = -8,
+  max = 5.5,
+  sample_type = c("x" = "tissue", "y" = "tissue"),
+  num_top = number_proteins_to_label,
+  correlation_palette = c(
+    "eWAT 6w p < 0.05" = ewat_hfd_6w,
+    "eWAT 15w p < 0.05" = ewat_hfd_15w,
+    "Not significant" = not_significant,
+    "Both p < 0.05" = both
+  ),
+  x_lab = expression("eWAT 6w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("eWAT 15w, log"[2] * "(HFD/chow)"),
+  drop = "blank",
+  top = c(c('MANF', 'GPR50', 'LEP', 'FABP4', 'SYUG', 'PLIN1', 'FAM20C', 'PLTP', 'SERPINF1', 'PAM', 'PPIC', 'FSTL1', 'PLIN2', 'CFD', 'PLIN4', 'CDNF', 'G6PE', 'APOE', 'LPL', 'BHMT1', 'APOC3', 'APOA4', 'NENF'), new_interdepot)
+
+)
+save_plot("5e_correlation_plot",
+  wd = 2,
+  ht = 4
+)
+
+```
+
+```{r, fig.height=4, fig.width=2}
+
+depot_diff_proteins <- c("NPC2","SMOC1","SGPL1","CAVIN2","GPAT3","PRELP","CD1D1","TAP2","H2-D1","H2-K1")
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20240907_CRW_B25A",
+    "y" = "20240909_CRW_B25B"
+  ),
+  min = -8,
+  max = 5.5,
+  sample_type = c("x" = "tissue", "y" = "tissue"),
+  num_top = number_proteins_to_label,
+  correlation_palette = c(
+    "iWAT 15w p < 0.05" = iwat_hfd_15w,
+    "eWAT 15w p < 0.05" = ewat_hfd_15w,
+    "Not significant" = not_significant,
+    "Both p < 0.05" = both
+  ),
+  x_lab = expression("iWAT 15w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("eWAT 15w, log"[2] * "(HFD/chow)"),
+  top = c(c('MANF', 'GPR50', 'LEP', 'FABP4', 'SYUG', 'PLIN1', 'FAM20C', 'PLTP', 'SERPINF1', 'PAM', 'PLIN4', 'CDNF', 'G6PE', 'APOE', 'APOA4', 'NENF'), depot_diff_proteins),
+  drop = "blank"
+)
+save_plot("5c_correlation_plot",
+  wd = 2,
+  ht = 4
+)
+```
+
+```{r, fig.height=4, fig.width=2}
+correlation_plot(
+  timepoints = c(
+    "x" = "20240427_CRW_B17A",
+    "y" = "20240429_CRW_B17B"
+  ),
+  min = -8,
+  max = 5.5,
+  sample_type = c("x" = "tissue", "y" = "tissue"),
+  num_top = number_proteins_to_label,
+  correlation_palette = c(
+    "iWAT 6w p < 0.05" = iwat_hfd_6w,
+    "eWAT 6w p < 0.05" = ewat_hfd_6w,
+    "Not significant" = not_significant,
+    "Both p < 0.05" = both
+  ),
+  x_lab = expression("iWAT 6w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("eWAT 6w, log"[2] * "(HFD/chow)"),
+  drop = "blank",
+  top = c(c('MANF', 'GPR50', 'LEP', 'FABP4', 'SYUG', 'PLIN1', 'FAM20C', 'PLTP', 'SERPINF1', 'PAM', 'PLIN4',  'G6PE', 'APOE', 'APOA4', 'NENF'), depot_diff_proteins)
+)
+save_plot("5b_correlation_plot",
+  wd = 2,
+  ht = 4
+)
+```
+
+## 5i ER heatmap
+
+```{r, fig.width=3.8, fig.height=1}
+endo_stress <- c("Abca7", "Abl1", "Aff4", "Afg2b", "Agr2", "Aifm1", "Akt1", "Akt2", "Akt3", "Alox15", "Alox5", "Amfr", "Anks4b", "Ankzf1", "Apaf1", "App", "Aqp11", "Asb11", "Atad3a", "Atf3", "Atf4", "Atf6", "Atf6b", "Atg10", "Atp2a1", "Atp2a3", "Atxn3", "Aup1", "Bag6", "Bak1", "Bax", "Bbc3", "Bbs1", "Bbs10", "Bcap31", "Bcl2", "Bcl2l1", "Bcl2l11", "Bfar", "Bhlha15", "Bid", "Bok", "Brsk2", "Calr", "Calr3", "Calr4", "Canx", "Casp12", "Casp3", "Casp9", "Cav1", "Ccdc47", "Ccnd1", "Cdk5rap3", "Cebpb", "Cep290", "Cert1", "Cftr", "Chac1", "Clgn", "Clu", "Cops5", "Creb3", "Creb3l1", "Creb3l2", "Creb3l3", "Crebrf", "D1Pas1", "Dab2ip", "Ddit3", "Ddrgk1", "Ddx3x", "Derl1", "Derl2", "Derl3", "Dnajb12", "Dnajb2", "Dnajb9", "Dnajc10", "Dnajc3", "Dnm1l", "Ecpas", "Edem1", "Edem2", "Edem3", "Eif2a", "Eif2ak2", "Eif2ak3", "Eif2ak4", "Eif2b5", "Eif2s1", "Eif4g1", "Elavl4", "Erlec1", "Erlin1", "Erlin2", "Ermp1", "Ern1", "Ern2", "Ero1a", "Erp27", "Erp29", "Erp44", "Faf1", "Faf2", "Fbxo17", "Fbxo2", "Fbxo27", "Fbxo44", "Fbxo6", "Fcgr2b", "Ficd", "Fis1", "Flot1", "Foxred2", "Get4", "Gorasp2", "Grina", "Gsk3b", "H13", "Herpud1", "Herpud2", "Hsp90b1", "Hspa5", "Hyou1", "Ifng", "Igtp", "Ikbkg", "Ins2", "Itpr1", "Jagn1", "Jkamp", "Jun", "Kcnj8", "Lhx1os", "Lpcat3", "Lrrk2", "Man1a", "Man1a2", "Man1b1", "Man1c1", "Manf", "Map3k20", "Map3k5", "Marchf6", "Marcks", "Mbtps2", "Nccrp1", "Nck1", "Nck2", "Nfe2l1", "Nfe2l2", "Nhlrc1", "Niban1", "Nod1", "Nod2", "Nploc4", "Nr1h2", "Nr1h3", "Nrbf2", "Nrros", "Nupr1", "Opa1", "Os9", "P4hb", "Park7", "Parp16", "Parp6", "Parp8", "Pdia2", "Pdia3", "Pdia4", "Pdia6", "Pdx1", "Pigbos1", "Pik3r1", "Pik3r2", "Pla2g6", "Pmaip1", "Pml", "Pmp22", "Ppp1r15a", "Ppp1r15b", "Ppp2cb", "Prkn", "Psmc6", "Ptpn1", "Ptpn2", "Qrich1", "Rasgrf1", "Rasgrf2", "Rcn3", "Rhbdd1", "Rnf103", "Rnf121", "Rnf139", "Rnf145", "Rnf183", "Rnf185", "Rnf186", "Rnf5", "Rnft1", "Rnft2", "Rpap2", "Scamp5", "Sdf2l1", "Sec16a", "Sec61b", "Sec61bl", "Sel1l", "Sel1l2", "Selenok", "Selenon", "Selenos", "Serinc3", "Serp1", "Serp2", "Sesn2", "Sgf29", "Sgta", "Sirt1", "Spop", "Srpx", "Stc2", "Stt3b", "Stub1", "Svip", "Syvn1", "Tardbp", "Tbl2", "Thbs1", "Thbs4", "Tmbim4", "Tmbim6", "Tmco1", "Tmed2", "Tmem117", "Tmem129", "Tmem238l", "Tmem258", "Tmem259", "Tmem33", "Tmem67", "Tmtc3", "Tmtc4", "Tmub1", "Tmub2", "Tmx1", "Tnfrsf10b", "Tor1a", "Trib3", "Trim13", "Trim25", "Trp53", "Txndc12", "Uba5", "Ubac2", "Ube2g2", "Ube2j1", "Ube2j2", "Ube2k", "Ube4a", "Ube4b", "Ubqln1", "Ubqln2", "Ubxn1", "Ubxn10", "Ubxn2a", "Ubxn4", "Ubxn6", "Ubxn8", "Ufc1", "Ufd1", "Ufl1", "Ufm1", "Umod", "Usp13", "Usp14", "Usp19", "Usp25", "Vapb", "Vcp", "Wfs1", "Xbp1", "Yod1")
+
+read_experiment("20240907_CRW_B25A", "tissue") %>%
+  filter(gene_name %in% endo_stress) %>%
+  prepare_fc_data("chow", filter_to_sig = TRUE) %>%
+  fc_heatmap(output_filename = "5i_fc_heatmap_iWAT.pdf", width = 3.8, height = 1, control_name = "chow", group_colors = c(iwat_hfd_15w), labels = c("15w HFD iWAT"), n_cell_types = 1, col_name_rot = 90)
+
+read_experiment("20240909_CRW_B25B", "tissue") %>%
+  filter(gene_name %in% endo_stress) %>%
+  prepare_fc_data("chow", filter_to_sig = TRUE) %>%
+  fc_heatmap(output_filename = "5i_fc_heatmap_eWAT.pdf", width = 3.8, height = 1, control_name = "chow", group_colors = c(ewat_hfd_15w), labels = c("15w HFD eWAT"), n_cell_types = 1, col_name_rot = 90)
+```
+
+# Figure 6
+
+```{r}
+# check number quantified in each experiment
+for (experiment in c(
+  "6w" = "20240401_CRW_B13",
+  "15w" = "20240917_CRW_B30"
+)) {
+  experiment %>%
+    read_experiment(sample_type = "serum") %>%
+    pull(uniprot_id) %>%
+    unique() %>%
+    length() %>%
+    print()
+}
+```
+
+## 6D: Heatmap
+
+```{r, fig.width=2.06, fig.height=3.3}
+read_experiment("20240401_CRW_B13", "plasma") %>%
+  fc_heatmap_with_annotation(
+    output_filename = "6d_fc_heatmap_6w.pdf",
+    width = 2.06,
+    height = 3.3,
+    control_name = "chow",
+    group_colors = c("#faa41a")
+  )
+```
+
+## 6E: Heatmap
+
+```{r, fig.width=2.2, fig.height=5.7}
+read_experiment("20240917_CRW_B30", "plasma") %>%
+  fc_heatmap_with_annotation(
+    output_filename = "6e_fc_heatmap_15w.pdf",
+    width = 2.2,
+    height = 5.7,
+    control_name = "chow",
+    group_colors = c("#ed2024")
+  )
+```
+
+## 6G: Molecular weight bar plot
+
+```{r, fig.height=1.1, fig.width=1.9723}
+# 6W HFD
+w6 <- read_experiment("20240401_CRW_B13", "plasma") %>%
+  dplyr::select(uniprot_id, Mass) %>%
+  mutate(timepoint = "plasma 6W")
+# 15W HFD
+mw_df <- read_experiment("20240917_CRW_B30", "plasma") %>%
+  dplyr::select(uniprot_id, Mass) %>%
+  mutate(timepoint = "plasma 15W") %>%
+  rbind(w6)
+
+mw_df <- read_experiment("20240909_CRW_B25B", "tissue") %>%
+  dplyr::select(uniprot_id, Mass) %>%
+  mutate(timepoint = "tissue 6W") %>%
+  rbind(mw_df)
+
+mw_df <- read_experiment("20240907_CRW_B25A", "tissue") %>%
+  dplyr::select(uniprot_id, Mass) %>%
+  mutate(timepoint = "tissue 15W") %>%
+  rbind(mw_df)
+
+mw_palette <- c(
+  ">60 kDa" = "#999b9e",
+  "30-60 kDa" = "#841E5AFF",
+  "15-30 kDa" = "#F06043FF",
+  "<15 kDa" = "#FAEBDDFF"
+)
+
+# bin data
+gg_obj <- mw_df %>%
+  mutate(
+    Mass = Mass / 1000, # convert to kDa
+    binned_mass = case_when(
+      Mass > 60 ~ ">60 kDa",
+      Mass > 30 ~ "30-60 kDa",
+      Mass > 15 ~ "15-30 kDa",
+      TRUE ~ "<15 kDa",
+    )
+  ) %>%
+  mutate(binned_mass = factor(binned_mass, levels = rev(names(mw_palette)))) %>%
+  arrange(binned_mass) %>%
+  ggplot(aes(
+    y = timepoint,
+    fill = binned_mass
+  )) +
+  geom_bar(position = "fill", size = LINE_WIDTH, color = "black", width = 0.65) +
+  scale_fill_manual(values = mw_palette)
+percent_barplot_theme(gg_obj)
+save_plot("6g_molecular_weight", ht = 1.1, wd = 1.9723)
+```
+
+### Molecular weight boxplot
+
+```{r, fig.width=2, fig.height=1.5}
+mw_df %>%
+  ggplot(aes(x = log2(Mass / 1000), y = timepoint)) +
+  geom_boxplot(size = LINE_WIDTH, outlier.size = 0.5) +
+  turboid_theme() +
+  labs(y = NULL, x = expression("log"[2] * "(kDA molecular weight)"))
+
+save_plot("s6_boxplot", wd = 2, ht = 1.5)
+
+mw_df %>%
+  arrange(desc(Mass)) %>%
+  head()
+```
+
+## 6H: Outcyte percent barplot
+
+```{r, fig.height=1.1, fig.width=2.2}
+replace_list <- c(
+  "Intracellular" = "Intracellular",
+  "Signal_Peptide" = "Signal Peptide",
+  "Transmembrane" = "Transmembrane",
+  "UPS" = "UPS",
+  "NA" = "Other"
+)
+palette <- c(
+  "Signal Peptide" = "#721f81",
+  "Intracellular" = "#b73779",
+  "UPS" = "#f1605d",
+  "Transmembrane" = "#feb078",
+  "Other" = "lightgrey"
+)
+
+alb_plasma <- read_experiment("20240401_CRW_B13", "serum") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "plasma 6W")
+outcyte_df <- read_experiment("20240917_CRW_B30", "serum") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "plasma 15W") %>%
+  rbind(alb_plasma)
+
+outycte_barplot(outcyte_df)
+save_plot("6c_percent_barplot", ht = 1.1, wd = 2.2)
+
+outcyte_df <- read_experiment("20240909_CRW_B25B", "tissue") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "iWAT tissue 6W") %>%
+  rbind(outcyte_df)
+
+outcyte_df <- read_experiment("20240907_CRW_B25A", "tissue") %>%
+  dplyr::select(uniprot_id, Outcyte) %>%
+  mutate(experiment = "iWAT tissue 15W") %>%
+  rbind(outcyte_df)
+
+outycte_barplot(outcyte_df)
+
+
+outcyte_df
+
+save_plot("s6a_percent_barplot", ht = 1.1, wd = 2.2)
+```
+
+## 6F: correlation scatter
+
+```{r, fig.width=4, fig.height=2}
+s6_scatterplot_list <- c('LBP', 'LEP', 'CES1D', 'SERPINA3C', 'SYUG', 'CNPY2', 'C6', 'PLIN1', 'FAM20C', 'PLTP', 'SERPINF1', 'PAM', 'PPIC', 'FSTL1', 'CFD', 'PLIN4', 'G6PE', 'APOE', 'LPL', 'APOC3', 'C3', 'APOA4', 'NENF', 'LRG1')
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20240401_CRW_B13",
+    "y" = "20240917_CRW_B30"
+  ),
+  sample_type = c("x" = "serum", "y" = "serum"),
+  min = -3.2,
+  max = 4,
+  correlation_palette = c(
+    "6W p < 0.05" = "orange",
+    "15W p < 0.05" = "red",
+    "Not significant" = "grey",
+    "Both p < 0.05" = "darkred"
+  ),
+  x_lab = expression("plasma 6w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("plasma 15w, log"[2] * "(HFD/chow)"),
+  drop=  "blank",
+  top = s6_scatterplot_list
+)
+
+save_plot("6f_correlation_plot",
+  wd = 4,
+  ht = 2
+)
+```
+
+```{r, fig.width=4, fig.height=2}
+```
+
+### Plasma vs tissue
+
+
+```{r, fig.width=4, fig.height=2}
+correlation_plot(
+  timepoints = c(
+    "x" = "20240917_CRW_B30",
+    "y" = "20240907_CRW_B25A"
+  ),
+  min = -7.6,
+  max = 5,
+  sample_type = c("x" = "serum", "y" = "tissue"),
+  num_top = 10,
+  x_lab = expression("plasma 15w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("iWAT tissue 15w, log"[2] * "(HFD/chow)"),
+  correlation_palette = c(
+    "Plasma p < 0.05" = "orange",
+    "Tissue p < 0.05" = "red",
+    "Not significant" = "grey",
+    "Both p < 0.05" = "darkred"
+  ),
+  drop = "blank",
+  top = s6_scatterplot_list
+)
+save_plot("6g_correlation_plot",
+  wd = 4,
+  ht = 2
+)
+
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20240917_CRW_B30",
+    "y" = "20240909_CRW_B25B"
+  ),
+  min = -7.6,
+  max = 5,
+  sample_type = c("x" = "serum", "y" = "tissue"),
+  num_top = 10,
+  x_lab = expression("plasma 15w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("eWAT tissue 15w, log"[2] * "(HFD/chow)"),
+  correlation_palette = c(
+    "Plasma p < 0.05" = "orange",
+    "Tissue p < 0.05" = "red",
+    "Not significant" = "grey",
+    "Both p < 0.05" = "darkred"
+  ),
+  drop = "blank",
+  top = s6_scatterplot_list
+)
+save_plot("s6b_correlation_plot",
+  wd = 4,
+  ht = 2
+)
+```
+
+## 6I Abundance plot
+
+comparing abundance in HFD plasma dat to published concentrations
+
+```{r, fig.width=2, fig.height=4}
+abundance_plot_highlights_6 <- c("SYUG", "LRG1", "G6PE", "CFD", "PAM", "APOA4", "SERPINF1", "LEP")
+for (experiment in c(
+  "6w" = "20240401_CRW_B13",
+  "15w" = "20240917_CRW_B30"
+)) { # 6w and 15w
+  abundance_plot(
+    experiment = experiment,
+    sample_type = serum,
+    condition = "HFD",
+    label_proteins = abundance_plot_highlights_6
+  )
+  save_plot(
+    fn = paste0("6i_abundance_plot", experiment),
+    ht = 4,
+    wd = 2
+  )
+}
+
+envinfo
+```
+
+# Figure 7
+
+## 7C Bubble plot
+
+```{r, fig.height=5.5, fig.width=3.9}
+bubble_plot <- function(proteins, chapters) {
+  df <-
+    "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/UKBB_plasma_proteome_atlas/ukbb_turboid_intersect_all_associations.csv" %>%
+    read_csv(
+      show_col_types = FALSE,
+      col_types = cols(P_value = col_character())
+    ) %>%
+    mutate(
+      P_value = as.numeric(P_value),
+    ) %>%
+    filter(
+      toupper(Protein) %in% toupper(proteins),
+      Disease_category %in% chapters,
+      disease_type == "prevalent"
+    )
+
+  sig_diseases <- df %>%
+    filter(`significant_boneferroni_p-value_less_than_0.05` == TRUE) %>%
+    pull(Disease) %>%
+    unique()
+
+  plt <- df %>%
+    filter(Disease %in% sig_diseases) %>%
+    mutate(
+      `HR_or_OR[95%CI]` = str_split(`HR_or_OR[95%CI]`, " ") %>% map_chr(1) %>% as.numeric(),
+      Disease_category = gsub("Chapter [IVX]+ ", "", Disease_category) %>% str_wrap(width = 25),
+      Disease = str_wrap(Disease, width = 40),
+      Protein = factor(Protein, levels = proteins)
+    ) %>%
+    ggplot(aes(
+      x = Protein,
+      y = reorder_within(Disease, by = -log2(P_value), within = Disease_category),
+      size = -log10(P_value),
+      fill = log2(`HR_or_OR[95%CI]`)
+    )) +
+    geom_point(
+      shape = 21,
+      color = "black",
+      stroke = LINE_WIDTH
+    ) +
+    facet_grid(
+      rows = vars(Disease_category),
+      scales = "free",
+      space = "free"
+    ) +
+    turboid_theme() +
+    theme(panel.grid.major = element_line(color = "grey90", linewidth = LINE_WIDTH)) +
+    scale_fill_gradient2(
+      high = "red",
+      low = "blue",
+      mid = "white",
+      limits = c(-2.3, 2.3),
+      midpoint = 0,
+      na.value = "red"
+    ) +
+    scale_size_continuous(range = c(0.5, 3.8), breaks = c(20, 40, 60)) +
+    theme(
+      strip.text = element_text(
+        size = FONT_SIZE,
+        color = "black",
+        family = FONT_FAMILY
+      ),
+      axis.text.x = element_text(
+        size = FONT_SIZE,
+        color = "black",
+        family = FONT_FAMILY,
+        angle = 45,
+        vjust = 1,
+        hjust = 1
+      ),
+      legend.spacing.y = unit(5, "mm"),
+      legend.position = "right",
+      legend.justification = "center"
+    ) +
+    labs(
+      x = NULL,
+      y = NULL,
+      fill = expression("log"[2] * "(association)"),
+      size = expression("-log"[10] * "(p-value)")
+    ) +
+    guides(fill = guide_colorbar(
+      barwidth = 0.6,
+      barheight = 4,
+    )) +
+    scale_y_reordered()
+  print(plt)
+  return(plt)
+}
+
+bubble_plot(
+  proteins = c("LEP","SNCG","CFD","LRG1","APOA4","PAM","SERPINF1","BCHE","GSN","GHR"),
+  chapters = c(
+    "Chapter IV Endocrine, nutritional and metabolic diseases",
+    "Chapter IX Diseases of the circulatory system"
+  )
+)
+
+save_plot <- function(fn, wd, ht) {
+  ggsave(
+    paste0(PLOT_RESULTS_PATH, fn, ".pdf"),
+    width = wd,
+    height = ht,
+    dpi = 300,
+    device = cairo_pdf
+  )
+}
+
+save_plot(
+  fn = "7c_dot_plot_circulatory_endocrine",
+  wd = 3.9,
+  ht = 5.5
+)
+
+
+
+```
+
+
+```{r, fig.height=5.5, fig.width=3.9}
+proteins_1 = c("LEP","SNCG","CFD","LRG1","APOA4","PAM","SERPINF1","BCHE","GSN","GHR")
+proteins_2 = c("APOA4","SERPINF1","BCHE","LIFR","ITIH3","C7","FGL1","AMBP","GSN","GHR")
+chapters_1 = c(
+  "Chapter IV Endocrine, nutritional and metabolic diseases",
+  "Chapter IX Diseases of the circulatory system"
+)
+chapters_2 = c(
+  "Chapter I Certain infectious and parasitic diseases"
+)
+
+df <-
+  "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/UKBB_plasma_proteome_atlas/ukbb_turboid_intersect_all_associations.csv" %>%
+  read_csv(
+    show_col_types = FALSE,
+    col_types = cols(P_value = col_character())
+  ) %>%
+  mutate(
+    P_value = as.numeric(P_value),
+  ) %>%
+  filter(
+    (toupper(Protein) %in% toupper(proteins_1)) & (Disease_category  %in% chapters_1) |
+    (toupper(Protein) %in% toupper(proteins_2)) & (Disease_category  %in% chapters_2),
+    disease_type == "prevalent"
+  )
+
+sig_diseases <- df %>%
+  filter(`significant_boneferroni_p-value_less_than_0.05` == TRUE) %>%
+  pull(Disease) %>%
+  unique()
+
+plt <- df %>%
+  filter(Disease %in% sig_diseases) %>%
+  mutate(
+    `HR_or_OR[95%CI]` = str_split(`HR_or_OR[95%CI]`, " ") %>% map_chr(1) %>% as.numeric(),
+    Disease_category = gsub("Chapter [IVX]+ ", "", Disease_category) %>% str_wrap(width = 25),
+    Disease = str_wrap(Disease, width = 40),
+    Protein = factor(Protein, levels = unique(c(proteins_1, proteins_2)))
+  ) %>%
+  ggplot(aes(
+    x = Protein,
+    y = reorder_within(Disease, by = -log2(P_value), within = Disease_category),
+    size = -log10(P_value),
+    fill = log2(`HR_or_OR[95%CI]`)
+  )) +
+  geom_point(
+    shape = 21,
+    color = "black",
+    stroke = LINE_WIDTH
+  ) +
+  facet_grid(
+    rows = vars(Disease_category),
+    scales = "free",
+    space = "free"
+  ) +
+  turboid_theme() +
+  theme(panel.grid.major = element_line(color = "grey90", linewidth = LINE_WIDTH)) +
+  scale_fill_gradient2(
+    high = "red",
+    low = "blue",
+    mid = "white",
+    limits = c(-2.3, 2.3),
+    midpoint = 0,
+    na.value = "red"
+  ) +
+  scale_size_continuous(range = c(0.5, 3.8), breaks = c(20, 40, 60)) +
+  theme(
+    strip.text = element_text(
+      size = FONT_SIZE,
+      color = "black",
+      family = FONT_FAMILY
+    ),
+    axis.text.x = element_text(
+      size = FONT_SIZE,
+      color = "black",
+      family = FONT_FAMILY,
+      angle = 45,
+      vjust = 1,
+      hjust = 1
+    ),
+    legend.spacing.y = unit(5, "mm"),
+    legend.position = "right",
+    legend.justification = "center"
+  ) +
+  labs(
+    x = NULL,
+    y = NULL,
+    fill = expression("log"[2] * "(association)"),
+    size = expression("-log"[10] * "(p-value)")
+  ) +
+  guides(fill = guide_colorbar(
+    barwidth = 0.6,
+    barheight = 4,
+  )) +
+  scale_y_reordered()
+print(plt)
+
+
+
+save_plot <- function(fn, wd, ht) {
+ggsave(
+  paste0(PLOT_RESULTS_PATH, fn, ".pdf"),
+  width = wd,
+  height = ht,
+  dpi = 300,
+  device = cairo_pdf
+)
+}
+
+save_plot(
+fn = "7c_dot_plot_circulatory_endocrine",
+wd = 3.9,
+ht = 5.5
+)
+
+
+
+```
+
+
+```{r, fig.width=6, fig.height=5.2}
+library(patchwork)
+
+proteins_1 = c("LEP","SNCG","CFD","LRG1","APOA4","PAM","SERPINF1","BCHE","GSN","GHR")
+proteins_2 = c("APOA4","SERPINF1","BCHE","LIFR","ITIH3","C7","FGL1","AMBP","GSN","GHR")
+chapters_1 = c(
+  "Chapter IV Endocrine, nutritional and metabolic diseases",
+  "Chapter IX Diseases of the circulatory system"
+)
+chapters_2 = c(
+  "Chapter I Certain infectious and parasitic diseases"
+)
+
+df <-
+  "/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/UKBB_plasma_proteome_atlas/ukbb_turboid_intersect_all_associations.csv" %>%
+  read_csv(
+    show_col_types = FALSE,
+    col_types = cols(P_value = col_character())
+  ) %>%
+  mutate(
+    P_value = as.numeric(P_value),
+  ) %>%
+  filter(
+    (toupper(Protein) %in% toupper(proteins_1)) & (Disease_category  %in% chapters_1) |
+    (toupper(Protein) %in% toupper(proteins_2)) & (Disease_category  %in% chapters_2),
+    disease_type == "prevalent"
+  )
+
+sig_diseases <- df %>%
+  filter(`significant_boneferroni_p-value_less_than_0.05` == TRUE) %>%
+  pull(Disease) %>%
+  unique()
+
+df_plot <- df %>%
+  filter(Disease %in% sig_diseases) %>%
+  mutate(
+    `HR_or_OR[95%CI]` = str_split(`HR_or_OR[95%CI]`, " ") %>% map_chr(1) %>% as.numeric(),
+    Disease_category = gsub("Chapter [IVX]+ ", "", Disease_category) %>% str_wrap(width = 25),
+    Disease = str_wrap(Disease, width = 40),
+    Protein = factor(Protein, levels = unique(c(proteins_1, proteins_2)))
+  )
+
+# Create separate plots for each category
+categories <- unique(df_plot$Disease_category)
+
+plot_list <- lapply(categories, function(cat) {
+  df_cat <- df_plot %>% filter(Disease_category == cat)
+  
+  ggplot(df_cat, aes(
+    x = Protein,
+    y = reorder_within(Disease, by = -log2(P_value), within = Disease_category),
+    size = -log10(P_value),
+    fill = log2(`HR_or_OR[95%CI]`)
+  )) +
+    geom_point(
+      shape = 21,
+      color = "black",
+      stroke = LINE_WIDTH
+    ) +
+    turboid_theme() +
+    theme(panel.grid.major = element_line(color = "grey90", linewidth = LINE_WIDTH)) +
+    scale_fill_gradient2(
+      high = "red",
+      low = "blue",
+      mid = "white",
+      limits = c(-2.3, 2.3),
+      midpoint = 0,
+      na.value = "red"
+    ) +
+    scale_size_continuous(range = c(0.5, 3.8), breaks = c(20, 40, 60)) +
+    theme(
+      strip.text = element_text(
+        size = FONT_SIZE,
+        color = "black",
+        family = FONT_FAMILY
+      ),
+      axis.text.x = element_text(
+        size = FONT_SIZE,
+        color = "black",
+        family = FONT_FAMILY,
+        angle = 45,
+        vjust = 1,
+        hjust = 1
+      ),
+      legend.spacing.y = unit(5, "mm"),
+      legend.position = if(cat == "Chapter I Certain infectious and parasitic diseases") "right" else "none",
+    ) +
+    labs(
+      x = NULL,
+      y = NULL,
+      fill = expression("log"[2] * "(association)"),
+      size = expression("-log"[10] * "(p-value)")
+    ) +
+    guides(fill = guide_colorbar(
+      barwidth = 0.6,
+      barheight = 4,
+    )) +
+    scale_y_reordered() +
+    ggtitle(cat)
+})
+
+# Combine plots with patchwork in p1 | (p2 / p3) layout
+plt <- plot_list[[3]] | (plot_list[[2]] / plot_list[[1]]) +
+  plot_layout(guides = "collect") +
+  plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+  theme(
+    plot.title = element_text(size = FONT_SIZE, family = FONT_FAMILY),
+    plot.margin = margin(2, 2, 2, 2)
+  )
+
+print(plt)
+
+save_plot <- function(fn, wd, ht) {
+ggsave(
+  paste0(PLOT_RESULTS_PATH, fn, ".pdf"),
+  width = wd,
+  height = ht,
+  dpi = 300,
+  device = cairo_pdf
+)
+}
+
+save_plot(
+fn = "7c_dot_plot_circulatory_endocrine",
+wd = 6,
+ht = 5.2
+)
+```
+
+
+```{r}
+# Example with free space
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(~ class, scales = "free_y", space = "free")
+```
+
+
+# 7D
+```{r, fig.height=3.8, fig.width=4.2}
+plt <- bubble_plot(
+  proteins = c("APOA4","SERPINF1","BCHE","LIFR","ITIH3","C7","FGL1","AMBP","GSN","GHR"),
+  chapters = c(
+    "Chapter I Certain infectious and parasitic diseases",
+    "Chapter III Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism"
+  )
+)
+print(plt)
+save_plot(
+  fn = "7d_infectious_disease_dot_plot",
+  wd = 4.2,
+  ht = 3.8
+)
+```
+
+## 7B: Correlation plot
+
+x is plasma fasting vs basal y is plasma HFD vs chow 6w colors???
+
+```{r, fig.width=4, fig.height=2}
+correlation_min <- -4
+correlation_max <- 4
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20221130_EV1_137", # x is adipocyte plasma, fast condition
+    "y" = "20240401_CRW_B13" # y is adipocyte plasma, 6w HFD condition
+  ),
+  sample_type = c(
+    "x" = "plasma",
+    "y" = "plasma"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "plasma, fasting p < 0.05" = "#85c6ed",
+    "plasma, 6w HFD p < 0.05" = "orange",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#B03D00"
+  ),
+  num_top = 7,
+  x_lab = expression("plasma, log"[2] * "(fasting/basal)"),
+  y_lab = expression("plasma, log"[2] * "(6w HFD/chow)"),
+  drop = "LPS"
+)
+
+
+save_plot(
+  fn = "7b_correlation_6w",
+  wd = 2,
+  ht = 4
+)
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20221130_EV1_137", # x is adipocyte plasma, fast condition
+    "y" = "20240917_CRW_B30" # y is adipocyte plasma, 15w HFD condition
+  ),
+  sample_type = c(
+    "x" = "plasma",
+    "y" = "plasma"
+  ),
+  min = correlation_min,
+  max = correlation_max,
+  correlation_palette = c(
+    "plasma, fasting p < 0.05" = "#85c6ed",
+    "plasma, 15w HFD p < 0.05" = "orange",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#B03D00"
+  ),
+  num_top = 7,
+  x_lab = expression("plasma, log"[2] * "(fasting/basal)"),
+  y_lab = expression("plasma, log"[2] * "(15w HFD/chow)"),
+  drop = "LPS"
+)
+
+
+save_plot(
+  fn = "7b_correlation_15w",
+  wd = 2,
+  ht = 4
+)
+```
+# Tissue fast vs HFD iWAT
+
+```{r}
+correlation_min <- -7.5
+correlation_max <- 4.8
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20220807_EV1_101", # x is adipocyte tissue, fast condition
+    "y" = "20240427_CRW_B17A" # y is adipocyte tissue, 6w HFD condition
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "tissue"
+  ),
+  min = correlation_min, max = correlation_max,
+  correlation_palette = c(
+    "tissue, fasting p < 0.05" = "#85c6ed",
+    "tissue, 6w HFD p < 0.05" = "orange",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#B03D00"
+  ),
+  num_top = 7,
+  x_lab = expression("tissue, log"[2] * "(fasting/basal)"),
+  y_lab = expression("tissue, log"[2] * "(6w HFD/chow)"),
+  drop = "LPS"
+)
+
+
+save_plot(
+  fn = "7x_tissue_correlation_6w",
+  wd = 2,
+  ht = 4
+)
+
+correlation_plot(
+  timepoints = c(
+    "x" = "20220807_EV1_101", # x is adipocyte tissue, fast condition
+    "y" = "20240907_CRW_B25A" # y is adipocyte tissue, 15w HFD condition
+  ),
+  sample_type = c(
+    "x" = "tissue",
+    "y" = "tissue"
+  ),
+  min = correlation_min,
+  max = correlation_max,
+  correlation_palette = c(
+    "tissue, fasting p < 0.05" = "#85c6ed",
+    "tissue, 15w HFD p < 0.05" = "orange",
+    "Not significant" = not_significant,
+    "Both p < 0.05" = "#B03D00"
+  ),
+  num_top = 7,
+  x_lab = expression("tissue, log"[2] * "(fasting/basal)"),
+  y_lab = expression("tissue, log"[2] * "(15w HFD/chow)"),
+  drop = "LPS"
+)
+
+
+save_plot(
+  fn = "7x_tissue_correlation_15w",
+  wd = 2,
+  ht = 4
+)
+```
+
+
+# ER stress 5C version
+
+```{r, fig.width=2, fig.height=2}
+
+iwat_hfd_6w <- "#f7941d"
+ewat_hfd_6w <- "#fede27"
+iwat_hfd_15w <- "#ef4136"
+ewat_hfd_15w <- "#9f1e37"
+both <- "#7E614899"
+
+correlation_plot <-
+  function(timepoints,
+           sample_type,
+           min,
+           max,
+           correlation_palette,
+           num_top = 6,
+           x_lab,
+           y_lab,
+           drop = NULL,
+           top = c()) {
+    # constants for defining position of margins
+    margin_factor <- 0.85
+    margin_position <- min * margin_factor
+    missing_point_value <- (min + margin_position) / 2
+
+    combined_df <- NULL
+    for (timepoint in names(timepoints)) {
+      df <-
+        read_experiment(timepoints[timepoint], sample_type[timepoint])
+      print("df")
+      print(colnames(df))
+      df <- df %>%
+        dplyr::select(
+          starts_with("log2_FC"),
+          starts_with("-log10_pval"),
+          uniprot_id,
+          `Entry Name`,
+          Symbol_human_jackson_homology_db
+        ) %>%
+        add_alias() %>%
+        mutate(time_point = timepoint) %>%
+        dplyr::select(-contains("cre+")) %>%
+        dplyr::select(-contains(drop))
+      colnames(df) <-
+        c(
+          "log2_FC",
+          "log10_pval",
+          "uniprot_id",
+          "Entry Name",
+          "Symbol_human_jackson_homology_db",
+          "protein",
+          "alias",
+          "time_point"
+        )
+      combined_df <- rbind(df, combined_df)
+    }
+
+    log_threshold <- -log10(0.05)
+    
+    print("Combined DF")
+    print(colnames(combined_df))
+
+    wide_df <- combined_df %>%
+      pivot_wider(
+        names_from = time_point,
+        values_from = c(log2_FC, log10_pval)
+      )
+    print("Wide DF")
+    print(colnames(wide_df))
+    #return(wide_df)
+
+    
+    combined_df <- wide_df %>%
+      mutate(
+        significance = case_when(
+            (alias %in% er_stress) & ((log10_pval_y > log_threshold) | (log10_pval_x > log_threshold))~ names(correlation_palette[1])[1],
+            (alias %in% er_stress) ~ names(correlation_palette[2])[1],
+          TRUE ~ names(correlation_palette[3])[1]
+        )
+      ) %>%
+      mutate(
+        significance = factor(significance, levels = names(correlation_palette)),
+        dist_from_orig = sqrt(log2_FC_x^2 + log2_FC_y^2),
+        distance_from_identity = abs(log2_FC_x - log2_FC_y)
+      ) %>%
+      arrange(desc(significance))
+
+    # calculate pearson's correlation from complete cases
+    pearson_r <- cor(combined_df$log2_FC_x, combined_df$log2_FC_y, use = "complete.obs") %>%
+      round(digits = 2)
+
+
+    print(max(combined_df$log2_FC_x, na.rm = TRUE))
+    print(max(combined_df$log2_FC_y, na.rm = TRUE))
+    print(min(combined_df$log2_FC_x, na.rm = TRUE))
+    print(min(combined_df$log2_FC_y, na.rm = TRUE))
+
+    combined_df <- combined_df %>%
+      # replace missing values with values on the margins
+      replace_na(list(log2_FC_x = missing_point_value, log2_FC_y = missing_point_value))
+
+    # pull list of proteins to give text labels
+    significant_no_missing <- combined_df %>%
+      filter(
+        significance == names(correlation_palette[1])[1],
+        log2_FC_x != missing_point_value,
+        log2_FC_y != missing_point_value
+      )
+    label_data <- rbind(
+      # top by distance from identity
+      significant_no_missing %>%
+        arrange(distance_from_identity) %>%
+        tail(num_top),
+      # top by distance from origin
+      significant_no_missing %>%
+        arrange(dist_from_orig) %>%
+        tail(num_top),
+      # top only quantified at x
+      combined_df %>%
+        arrange(abs(log2_FC_x)) %>%
+        filter(
+          significance == names(correlation_palette[1])[1],
+          (log2_FC_y == missing_point_value)
+        ) %>%
+        tail(num_top / 2),
+      # top only quantified at y
+      combined_df %>%
+        arrange(abs(log2_FC_y)) %>%
+        filter(
+          significance == names(correlation_palette[1])[1],
+          (log2_FC_x == missing_point_value)
+        ) %>%
+        tail(num_top / 2)
+    ) %>% distinct()
+    
+    if (length(top) > 0){
+      label_data <- combined_df %>% filter(alias %in% top)
+    }
+    
+    combined_df %>% 
+      filter(significance == names(correlation_palette[1])[1] ) %>%
+      pull(log2_FC_x) %>%
+      abs() %>%
+      max() %>%
+      print()
+    
+      combined_df %>% 
+      filter(significance == names(correlation_palette[1])[1] ) %>%
+      pull(log2_FC_y) %>%
+      abs() %>%
+      max() %>%
+      print()
+
+    plot <- combined_df %>%
+      ggplot(aes(
+        x = log2_FC_x,
+        y = log2_FC_y,
+        fill = significance,
+        label = alias
+      )) +
+      # margin lines
+      geom_hline(
+        yintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      geom_vline(
+        xintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      # origin lines
+      geom_hline(
+        yintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      geom_vline(
+        xintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      # diagonal boundary lines
+      geom_segment(
+        data = data.frame(),
+        aes(
+          x = c(margin_position, margin_position, margin_position + 1),
+          y = c(margin_position + 1, margin_position, margin_position),
+          xend = c(max - 1, max, max),
+          yend = c(max, max, max - 1),
+          linetype = c("dashed", "solid", "dashed")
+        ),
+        size = LINE_WIDTH,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        color = "black"
+      ) +
+      # scatterplot
+      geom_point(
+        shape = 21,
+        stroke = 0,
+        alpha = 0.55,
+        size = 1.4,
+      ) +
+      # protein labels
+      geom_text_repel(
+        data = label_data,
+        size = 1.94028,
+        family = FONT_FAMILY,
+        min.segment.length = 0,
+        #force = 3,
+        segment.size = LINE_WIDTH,
+        max.overlaps = Inf,
+        #nudge_y = -2,
+        #nudge_x = 2,
+        show.legend = FALSE#,
+        #segment.curvature = -0.1,
+      #segment.ncp = 3,
+      #segment.angle = 45
+      ) +
+      turboid_theme() +
+      theme(
+        aspect.ratio = 1,
+        # 20 lines of legend formatting
+        legend.position = "top",
+        legend.text = element_text(
+          size = 6,
+          color = "black",
+          family = "Arial",
+          margin = margin(l = 0)
+        ),
+        legend.box.background = element_blank(),
+        legend.justification.top = "top",
+        legend.justification = "center",
+        legend.box.just = "center",
+        legend.key = element_blank(),
+        legend.margin = margin(l = -5, b = -5.5),
+        legend.box.margin = margin(l = -5, b = -0.8),
+        legend.key.spacing.y = unit(-0.9, "cm"),
+        legend.key.spacing.x = unit(-0.1, "cm")
+      ) +
+      guides(fill = guide_legend(nrow = 2, override.aes = list(alpha = 1))) +
+      labs(
+        x = x_lab,
+        y = y_lab
+      ) +
+      scale_fill_manual(values = correlation_palette, name = NULL) +
+      scale_x_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_y_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_linetype_manual(values = c("dashed" = "dashed", "solid" = "solid")) +
+      geom_text(
+        mapping = aes(
+          x = min * 0.6,
+          y = max * 0.85,
+        ),
+        label = paste("R = ", as.character(pearson_r)),
+        inherit.aes = FALSE,
+        data = data.frame(),
+        size = 1.94028,
+        family = FONT_FAMILY
+      )
+
+    return(combined_df)
+  }
+
+combined_df <- correlation_plot(
+  timepoints = c(
+    "x" = "20240907_CRW_B25A",
+    "y" = "20240909_CRW_B25B"
+  ),
+  min = -8,
+  max = 5.5,
+  sample_type = c("x" = "tissue", "y" = "tissue"),
+  num_top = 7,
+  correlation_palette = c(
+    "ER stress, significant p < 0.05" = "plum4",
+    "ER stress, non-significant p > 0.05" = "pink3",
+    "Other" = "grey90"
+  ),
+  drop = "blank",
+  x_lab = expression("iWAT 15w, log"[2] * "(HFD/chow)"),
+  y_lab = expression("eWAT 15w, log"[2] * "(HFD/chow)")
+)
+save_plot("5x_er_stress_correlation_plot",
+  wd = 2,
+  ht = 4
+)
+
+```
+
+
+```{r}
+combined_df %>%
+  filter(significance == "ER stress, significant p < 0.05") %>%
+  arrange(abs(log2_FC_y))
+
+# x = 1.75
+# y =1.7
+```
+
+
+
+## 7b Dot plot
+
+```{r, fig.height=2.5, fig.width=4.75}
+fold_change_dot_plot <- function(highlight_genes, drop_groups = c()) {
+  df <- dep_path %>% 
+    read_csv(show_col_types = FALSE) %>%
+    filter(
+      comparison %in% c(
+        "LPS vs. basal",
+        "fast vs. basal",
+        "HFD vs. chow",
+        "eWAT_HFD vs. eWAT_chow",
+        "iWAT_HFD vs. iWAT_chow"
+      )
+    ) %>%
+    mutate(
+      time_point = replace_na(time_point, ""),
+      comparison = paste(time_point, comparison)
+    )
+  df <- df %>%
+    mutate(`Entry Name` = entry_name) %>%
+    add_alias() %>%
+    filter(
+      experiment %in% c(
+        # fast / LPS in tissue
+        "20220714_EV1_98",
+        "20220807_EV1_101",
+        # fast / LPS in plasma
+        "20221129_EV1_136",
+        "20221130_EV1_137",
+        # chow / HFD in plasma,
+        "20240401_CRW_B13",
+        "20240917_CRW_B30",
+        # chow / HFD in tissue 15w
+        "20240909_CRW_B25B",
+        "20240907_CRW_B25A",
+        # chow / HFD in tissue 6w
+        "20240427_CRW_B17A",
+        "20240429_CRW_B17B"
+      )
+    ) %>%
+    mutate(
+      tissue = case_when(
+        grepl("EV1_136|EV1_98", experiment) ~ "Hepatocyte",
+        grepl("EV1_101|B17A|B25A", experiment) ~ "Adipocyte iWAT",
+        grepl("B17B|B25B", experiment) ~ "Adipocyte eWAT",
+        grepl("B13|B30|EV1_137", experiment) ~ "Adipocyte",
+        grepl("eWAT", comparison) ~ "Adipocyte eWAT",
+        grepl("iWAT", comparison) ~ "Adipocyte iWAT",
+        TRUE ~ comparison
+      )
+    ) %>%
+    filter(alias %in% highlight_genes) %>%
+    mutate(
+      comparison = str_split(comparison, " vs. ") %>% map_chr(1),
+      comparison = gsub("eWAT_|iWAT_", "", comparison),
+      comparison = trimws(comparison),
+      comparison = recode(comparison, !!!c("fast" = "fasting")),
+      alias = factor(alias, levels = rev(highlight_genes)),
+      group = paste0(tissue, "\n", sample_type),
+      group = gsub(pattern = " iWAT\ntissue", replacement = "\niWAT tissue", x = group),
+      group = gsub(pattern = " eWAT\ntissue", replacement = "\neWAT tissue", x = group),
+      group = gsub(pattern = "serum", replacement = "plasma", x = group),
+      group = factor(
+        group,
+        levels = c(
+          "Adipocyte\niWAT tissue",
+          "Adipocyte\neWAT tissue",
+          "Adipocyte\nplasma",
+          "Hepatocyte\ntissue",
+          "Hepatocyte\nplasma"
+        )
+      ),
+      comparison = factor(comparison, levels = c("fasting", "LPS", "6w HFD", "15w HFD"))
+    ) %>%
+    filter(!(group %in% drop_groups))
+  
+    cluster_df <- df %>%
+    select(alias, comparison, group, log2_FC) %>%
+    unite("condition", comparison, group, sep = "_") %>%
+    distinct(alias, condition, .keep_all = TRUE) %>%
+    pivot_wider(names_from = condition, values_from = log2_FC) %>%
+    column_to_rownames("alias")
+    
+     priority_proteins <- c("SYUG", "LEP")
+  cluster_proteins <- setdiff(rownames(cluster_df), priority_proteins)
+  cluster_matrix <- as.matrix(cluster_df[cluster_proteins, ])
+  
+  
+  hc <- hclust(dist(cluster_matrix, method = "euclidean"), method = "complete")
+  clustered_order <- rownames(cluster_matrix)[hc$order]
+  
+  final_order <- c(clustered_order, priority_proteins)
+  
+  df <- df %>%
+    mutate(alias = factor(alias, levels = final_order))
+  
+  
+  plt <- df %>% ggplot(aes(
+    x = comparison,
+    y = alias,
+    fill = log2_FC,
+    size = `-log10_pval`
+  )) +
+    geom_point(shape = 21, stroke = LINE_WIDTH) +
+    facet_grid(
+      cols = vars(group),
+      scales = "free_x",
+      space = "free"
+    ) +
+    turboid_theme() +
+    theme(
+      panel.spacing.x = unit(0, "mm"),
+      panel.grid.major = element_line(color = "grey", linewidth = LINE_WIDTH),
+      strip.placement = "outside",
+      strip.text = element_text(family = FONT_FAMILY, size = FONT_SIZE, color = "black", margin = margin(b = 2)),
+      legend.position = "bottom",
+      strip.position = "bottom",
+      legend.key.height = unit(3, "mm"),
+      legend.key.width = unit(4, "mm")
+    ) +
+    scale_fill_gradient2(
+      high = "red",
+      low = "blue",
+      mid = "white",
+      limits = c(-3, 3),
+      oob = squish,
+      name = expression("log"[2] * "(FC from basal or chow)")
+    ) +
+    scale_size_continuous(
+      range = c(1, 3.8),
+      name = expression("-log"[10] * "(p-value)")
+    ) +
+    labs(x = NULL, y = NULL)
+  print(plt)
+  return(plt)
+}
+
+proteins_7b <- c("LEP","SYUG","CFD","LRG1","APOA4","PAM","SERPINF1","BCHE","LIFR","ITIH3","FGL1","C7","AMBP","GSN","GHR")
+fold_change_dot_plot(
+  highlight_genes = proteins_7b
+) + theme(axis.text.x = element_text(family = FONT_FAMILY, size = FONT_SIZE, color = "black", angle = 45, hjust = 1, vjust = 1))
+save_plot("7b_fc_dot_plot", ht = 2.5, wd = 4.75)
+```
+
+```{r, fig.width=2, fig.height=1.5}
+fold_change_dot_plot(
+  highlight_genes =
+    c(
+      "CDNF",
+      "MANF",
+      "NENF"
+    ), drop_groups = c("Hepatocyte\ntissue", "Adipocyte\nserum")
+) + theme(axis.text.x = element_text(family = FONT_FAMILY, size = FONT_SIZE, color = "black", angle = 45, hjust = 1, vjust = 1))
+
+save_plot("s5A_dot_plot", 2, 1.5)
+```
+
+```{r, fig.width=4.75, fig.height=2.7}
+fold_change_dot_plot(
+  highlight_genes =
+    c('B2MG',
+ 'C1RA',
+ 'C7',
+ 'C8B',
+ 'CFD',
+ 'ERAP1',
+ 'FBLN3',
+ 'FCN1',
+ 'G6PE',
+ 'GHR',
+ 'LBP',
+ 'PCYOX',
+ 'SERPINA3N',
+ 'SERPINF1',
+ 'TRFE'), 
+) + theme(axis.text.x = element_text(family = FONT_FAMILY, size = FONT_SIZE, color = "black", angle = 45, hjust = 1, vjust = 1))
+
+save_plot("s6g_fc_dot_plot", 4.75, 2.7)
+```
+
+
+
+
+```{r, fig.height=5.8, fig.width=2.8}
+fold_change_dot_plot <- function(highlight_genes) {
+  df <- dep_path %>%
+    read_csv(show_col_types = FALSE) %>%
+    filter(
+      comparison %in% c(
+        "LPS vs. basal",
+        "fast vs. basal",
+        "HFD vs. chow",
+        "eWAT_HFD vs. eWAT_chow",
+        "iWAT_HFD vs. iWAT_chow",
+        "eWAT_HFD vs. iWAT_HFD",
+        "eWAT_chow vs. iWAT_chow"
+      )
+    ) %>%
+    mutate(
+      time_point = replace_na(time_point, ""),
+      comparison = paste(time_point, comparison)
+    )
+
+  df <- df %>%
+    mutate(`Entry Name` = entry_name) %>%
+    add_alias() %>%
+    filter(
+      experiment %in% c(
+        # fast / LPS in tissue
+        # "20220714_EV1_98",
+        "20220807_EV1_101",
+        # fast / LPS in plasma
+        # "20221129_EV1_136",
+        "20221130_EV1_137",
+        # chow / HFD in plasma,
+        "20240401_CRW_B13",
+        "20240917_CRW_B30",
+        # chow / HFD in tissue 15w
+        "20240909_CRW_B25B",
+        "20240907_CRW_B25A",
+        # chow / HFD in tissue 6w
+        "20240427_CRW_B17A",
+        "20240429_CRW_B17B",
+        # iWAT vs eWAT
+        "20240430_CRW_B17C",
+        "20240501_CRW_B17D",
+        "20240911_CRW_B25C",
+        "20240915_CRW_B25D"
+      )
+    ) %>%
+    mutate(
+      tissue = case_when(
+        grepl("EV1_136|EV1_98", experiment) ~ "Hepatocyte",
+        grepl("EV1_101|B17A|B25A", experiment) ~ "Adipocyte\n(iWAT)",
+        grepl("B17B|B25B", experiment) ~ "Adipocyte\n(eWAT)",
+        grepl("B13|B30|EV1_137", experiment) ~ "Adipocyte",
+        # grepl("eWAT", comparison) ~ "Adipocyte (eWAT)",
+        # grepl("iWAT", comparison) ~ "Adipocyte (iWAT)",
+        TRUE ~ "Adipocyte"
+      )
+    ) %>%
+    filter(alias %in% highlight_genes) %>%
+    mutate(
+      comparison = str_split(comparison, " vs. ") %>% map_chr(1),
+      comparison = case_when(
+        tissue == "Adipocyte" ~ gsub("eWAT_", "eWAT/iWAT ", comparison),
+        TRUE ~ gsub("eWAT_", "", comparison)
+      ),
+      comparison = gsub("iWAT_", "", comparison),
+      comparison = trimws(comparison),
+      comparison = recode(comparison, !!!c("fast" = "fasting")),
+      # alias = factor(alias, levels = rev(highlight_genes)),
+      alias = as.character(alias), alias = case_when(grepl(pattern = "GO:0005783", x = `Gene Ontology (GO)`) ~ paste0("*", alias), TRUE ~ alias),
+      group = paste0(tissue, "\n", sample_type),
+      group = factor(
+        group,
+        levels = c(
+          "Adipocyte\n(iWAT)\ntissue",
+          "Adipocyte\n(eWAT)\ntissue",
+          "Adipocyte\ntissue",
+          "Hepatocyte\ntissue",
+          "Adipocyte\nserum",
+          "Hepatocyte\nserum"
+        )
+      ) # ,
+      # comparison = factor(comparison, levels = c("fasting", "LPS", "6w HFD", "15w HFD", "eWAT"))
+    )
+  sig_aliases <- df %>%
+    filter(Regulation %in% c("Significant Down", "Signficant Up")) %>%
+    pull(alias) %>%
+    as.character() # Convert factor to character
+  df <- df %>% filter(as.character(alias) %in% sig_aliases)
+  # try to sort proteins by first column
+  sort_order <- df %>%
+    filter(tissue == as.character("Adipocyte\n(iWAT)"), comparison == "15w HFD") %>%
+    arrange(log2_FC) %>%
+    pull(alias) %>%
+    as.character()
+
+  # Get all unique proteins in the dataset
+  all_proteins <- unique(as.character(df$alias))
+
+  # Combine: sorted proteins first, then any remaining proteins
+  a_levels <- c(setdiff(all_proteins, sort_order), sort_order)
+
+  df <- df %>%
+    mutate(alias = as.character(alias), alias = factor(alias, levels = a_levels)) %>%
+    arrange(alias)
+
+  plt <- df %>% ggplot(aes(
+    x = comparison,
+    y = alias,
+    fill = log2_FC,
+    size = `-log10_pval`
+  )) +
+    geom_point(shape = 21, stroke = LINE_WIDTH) +
+    facet_grid(
+      cols = vars(group),
+      scales = "free_x",
+      space = "free"
+    ) +
+    turboid_theme() +
+    theme(
+      panel.spacing.x = unit(0, "mm"),
+      panel.grid.major = element_line(color = "grey", linewidth = LINE_WIDTH),
+      strip.placement = "outside",
+      strip.text = element_text(family = FONT_FAMILY, size = FONT_SIZE, color = "black", margin = margin(b = 2)),
+      legend.position = "bottom",
+      axis.text.x = element_text(
+        size = FONT_SIZE,
+        color = "black",
+        family = FONT_FAMILY,
+        angle = 45,
+        vjust = 1,
+        hjust = 1
+      ),
+      legend.key.height = unit(3, "mm"),
+      legend.key.width = unit(4, "mm"),
+      legend.box.spacing = unit(0.5, "cm"),
+      legend.box.margin = margin(l = 0, b = 0)
+    ) +
+    scale_fill_gradient2(
+      high = "red",
+      low = "blue",
+      mid = "white",
+      limits = c(-3, 3),
+      oob = squish,
+      name = expression("log"[2] * "(FC)")
+    ) +
+    scale_size_continuous(
+      range = c(1, 3),
+      name = expression("-log"[10] * "(p-value)")
+    ) +
+    labs(x = NULL, y = NULL)
+  print(plt)
+  save_plot("depot_proteins", ht = 5.8, wd = 2.8)
+  return(df)
+}
+er_stress <- c("A0A1B0GS74", "A2AIX1", "MA1B1", "A2AJP5", "SELN", "PDIA2", "E9PW77", "UBE4A", "ATF6A", "G3UYF5", "G3X8R5", "FBX50", "J3QM81", "BAK", "CASPC", "P85B", "FLOT1", "M3K5", "BOK", "XBP1", "RNF5", "ATF6B", "CSN5", "B2L11", "NCK2", "AGR2", "STC2", "NEMO", "APAF", "ABL1", "INS2", "IFNG", "JUN", "PDIA4", "ENPL", "PDIA1", "BCL2", "ITPR1", "A4", "CALR", "DDX3L", "PMP22", "PR15A", "GRP78", "CCND1", "CFTR", "P85A", "MARCS", "RGRF1", "PDIA3", "CEBPB", "AKT1", "CALX", "DDIT3", "PTN1", "MA1A2", "LOX15", "LOX5", "CAV1", "CLGN", "PDX1", "FAF1", "WFS1", "UBP25", "ERP29", "SESN2", "OPA1", "UB2G2", "NPL4", "UBE2K", "TM258", "UFM1", "PRS10", "PP2AB", "AUP1", "UFD1", "BID", "CASP3", "KCNJ8", "PLPL9", "TERA", "E2AK2", "PTN2", "ATF4", "CLUS", "BAX", "EDEM3", "FAF2", "STT3B", "Q3TML0", "MANF", "Q3TQS0", "Q3TTF2", "PARP8", "RNFT2", "DAB2P", "UBP19", "FXRD2", "ERMP1", "NIBAN", "SVIP", "SE1L2", "TMUB2", "Q3V3N7", "UBP13", "LRRK2", "RN145", "JAGN1", "NR1H2", "ATF3", "NF2L2", "AKT2", "PML", "BAP31", "TRI25", "ELAV4", "NF2L1", "DDX3X", "B2CL1", "AT2A3", "BRSK2", "CE290", "FBX27", "Q6NXK9", "IF4G1", "UB2J2", "PARP6", "ECM29", "SERP2", "MARH6", "SPOP", "IF2A", "PAR16", "RN139", "FBX2", "DDRGK", "Q80YQ1", "PR15B", "ERLN2", "TMTC4", "UBX10", "TM117", "CR3L2", "Q8BH80", "RCN3", "NOD1", "RHBL4", "AQP11", "JKAMP", "FICD", "EDEM2", "SGTA", "EIF2A", "NRROS", "DERL2", "NHLC1", "TMTC3", "CASP9", "OTU1", "UFL1", "CRERF", "EI2BE", "MBTP2", "MBRL", "DNM1L", "OS9", "TM129", "ANS4B", "NOD2", "TRIB3", "RN183", "BFAR", "ERO1A", "UBAC2", "ATG10", "RN121", "UBQL1", "CHAC1", "AT2A1", "TMX1", "RPAP2", "UBXN4", "NRBF2", "UBA5", "ERLEC", "MBOA5", "ABCA7", "UROM", "ERLN1", "CR3L3", "RN185", "DNJC3", "TADBP", "TMCO1", "UBXN1", "SIR1", "EDEM1", "DERL1", "GORS2", "UBX2A", "CK5P3", "PARK7", "NCK1", "BBC3", "UBXN6", "SELS", "ASB11", "FIS1", "SC61B", "TXD12", "UFC1", "TMM33", "ATX3", "TRI13", "Q9CZ70", "CCD47", "GET4", "ERP44", "RN186", "BI1", "DERL3", "ERP27", "CALR3", "SGF29", "LFG4", "BBS10", "SYVN1", "DJC10", "IRGM3", "RNFT1", "C43BP", "ERN1", "TOR1A", "UBE4B", "AFF4", "LFG1", "MLTK", "SDF2L", "HERP2", "HERP1", "UB2J1", "SCAM5", "HYOU1", "SELK", "APR", "UBP14", "TMUB1", "BHA15", "DJB12", "DNJB2", "DNJB9", "E2AK4", "SERC3", "UBQL2", "TR10B", "FBX17", "FBX6", "AMFR", "TBL2", "SRPX", "TMED2", "RN103", "NUPR1", "AKT3", "CHIP", "GSK3B", "PRKN2", "AIFM1", "NR1H3", "CR3L1", "BAG6", "TSP4", "SERP1", "E2AK3", "ERN2", "SE1L1")
+df <- fold_change_dot_plot(
+  highlight_genes = calcium_homeostasis
+)
+
+
+```
+
+
+
+
+# Figure S7
+
+
+
+```{r}
+library(forestploter)
+forest_plot <- function(protein, disease_chapter){
+
+ukbb_df <- '/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Reference datasets/UKBB_plasma_proteome_atlas/ukbb_turboid_intersect_significant_associations_only.csv' %>%
+  read_csv(show_col_types = FALSE)%>%
+  filter(
+    disease_type == "prevalent",
+    Protein == protein,
+    Disease_category == disease_chapter) %>%
+  select(
+    Protein, Disease_category, Disease, NB_individual, NB_case, P_value, `OR[95%CI]`
+  ) %>%
+  mutate(
+    `Disease (n individuals, n cases)` =  paste0(Disease, " (", format(NB_individual, big.mark = ","), " / ", format(NB_case, big.mark = ","), ")"),
+    or = `OR[95%CI]` %>% str_split(" ") %>% map_chr(1) %>% as.numeric(),
+    or_low = `OR[95%CI]` %>% str_split("\\[") %>% map_chr(2) %>% str_split("-") %>% map_chr(1) %>% as.numeric(),
+    or_hi = `OR[95%CI]` %>% str_split("-") %>% map_chr(2) %>% str_split("\\]") %>% map_chr(1) %>% as.numeric(),
+    `P value` = sprintf("%.2e", P_value)
+    ) %>%
+  select(
+    `Disease (n individuals, n cases)`,
+    or_low,
+    or, 
+    or_hi,
+    `P value`
+  )
+if(nrow(ukbb_df) == 0){
+  return()
+}
+
+tm <- forest_theme(
+  base_size = 6,
+  base_family = "Arial",
+  title_gp = gpar(fontsize = 6, family = "Arial")
+  #core = list(fg_params = list(hjust = 1, x = 0.9))
+)
+
+ukbb_df$` ` <- paste(rep("     ", length(ukbb_df)), collapse = " ")
+p <- forest(
+  data = ukbb_df %>% select(`Disease (n individuals, n cases)`, " ",`P value`),
+  est = ukbb_df$or,
+  lower = ukbb_df$or_low,
+  upper = ukbb_df$or_hi,
+  ticks_at = seq(min(-1, round(min(ukbb_df$or_low))), round(max(ukbb_df$or_hi)), by = 1),
+  ref_line = 1,
+  ci_column = 2,
+ arrow_lab = c("Lower Prevalence", "Higher Prevalence"),
+ theme = tm,
+ title = paste(protein, gsub("Chapter [IVX]+ ", "", disease_chapter)),
+
+)
+
+p_wh <- get_wh(plot = p, unit = "in")
+fn <- paste(protein, gsub("Chapter [IVX]+ ", "", disease_chapter))
+pdf(paste0('/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Data visualization/03_plots/0_forest_plots/', fn, ".pdf"), width = p_wh[1], height = p_wh[2])
+print(p)
+dev.off()
+print(p)
+}
+
+for (target in c("LIFR","C7","SERPINF1", "SNCG", "LRG1","APOA4", "BCHE")){
+  for (disease_chapter in disease_chapters){
+    print(disease_chapter)
+    forest_plot(target, disease_chapter)
+  }
+}
+
+ukbb_df
+```
+
+
+# Cross-referencing
+
+c) Line 297. The authors report significant diet-specific regulation of iWAT and eWAT proteins. How does this compare with data from previous studies examining the same question using other mass spectrometry proteomics based approaches?
+
+```{r}
+turboid_de <- '/Users/henrysanford/Dropbox @RU Dropbox/Vinogradova Laboratory/TurboID manuscript/Supplementary Data/Supplementary Data_for review/Data S3.xlsx' |> 
+  read_xlsx(skip = 2)
+harney_de <- "reference_data/previous_studies/Harney_S1.xlsx" |> 
+  read_xlsx(skip = 1)
+
+```
+
+
+https://www.sciencedirect.com/science/article/pii/S2211124721001182#mmc2
+
+
+```{r}
+joined <- turboid_de |> 
+  mutate(Gene.names = Symbol_mouse_jackson_homology_db) |> 
+  filter(!is.na(Gene.names)) |> 
+  left_join(y = harney_de, by = "Gene.names") |> 
+  arrange(by = entry_name)
+
+# renaming columns because original column names are insane
+x_lfc_name <- "Adiponectin_Tissue_log2_FC_fast vs. basal_20220807_EV1_101"
+y_lfc_name <- "vWAT\r\n(Fasted/Fed), Adlib\r\nLog2 Fold change"
+x_pval_name <- "Adiponectin_Tissue_neg_log10_pval_fast vs. basal_20220807_EV1_101"
+y_pval_name <- "scWAT\r\nDiet\r\n-Log10(P) BH" 
+
+x_lab <- expression("iWAT, log"[2]*"(fast vs basal)")
+y_lab <- expression("scWAT Adlib, log"[2]*"(Fasted/Fed")
+
+wide_df <- joined |> 
+  rename(log2_FC_x = all_of(x_lfc_name),
+         log2_FC_y = all_of(y_lfc_name),
+         log10_pval_x = all_of(x_pval_name),
+         log10_pval_y = all_of(y_pval_name)) |>
+  select(
+    Gene.names, 
+    log2_FC_x, log2_FC_y, log10_pval_x, log10_pval_y) |> 
+    mutate(across(c(log2_FC_x, log2_FC_y, log10_pval_x, log10_pval_y), ~as.numeric(na_if(.x, "NA")))) |> 
+  filter(!(is.na(log2_FC_x) & is.na(log2_FC_y))) 
+
+correlation_plot(wide_df |> mutate(), x_lab, y_lab, correlation_palette = c_palette, min = -5, max = 4)
+
+ggsave(paste0("Chow vs Basal, iWAT and SC tissue", ".pdf"), width =2, height = 4)
+ggsave(paste0("Chow vs Basal, iWAT and SC tissue", ".png"), width =2, height = 4)
+
+
+
+```
+
+```{r, fig.width=2, fig.height=3}
+
+
+correlation_plot <- function(wide_df, x_lab, y_lab, min = -8, max = 7, correlation_palette = c()){
+num_top <- 7
+log_threshold <- -log10(0.05)
+top = c()
+margin_factor <- 0.85
+margin_position <- min * margin_factor
+missing_point_value <- (min + margin_position) / 2
+
+combined_df <- wide_df %>%
+      mutate(
+        alias = Gene.names,
+        significance = case_when(
+          (log10_pval_x > log_threshold) &
+            (log10_pval_y > log_threshold) ~ names(correlation_palette[4])[1],
+          (log10_pval_y > log_threshold) ~ names(correlation_palette[2])[1],
+          (log10_pval_x > log_threshold) ~ names(correlation_palette[1])[1],
+          TRUE ~ names(correlation_palette[3])[1]
+        )
+      ) %>%
+      mutate(
+        #significance = factor(significance, levels = names(correlation_palette)),
+        dist_from_orig = sqrt(log2_FC_x^2 + log2_FC_y^2),
+        distance_from_identity = abs(log2_FC_x - log2_FC_y)
+      ) 
+
+    # calculate pearson's correlation from complete cases
+    pearson_r <- cor(combined_df$log2_FC_x, combined_df$log2_FC_y, use = "complete.obs") %>%
+      round(digits = 2)
+
+
+    print(max(combined_df$log2_FC_x, na.rm = TRUE))
+    print(max(combined_df$log2_FC_y, na.rm = TRUE))
+    print(min(combined_df$log2_FC_x, na.rm = TRUE))
+    print(min(combined_df$log2_FC_y, na.rm = TRUE))
+
+    combined_df <- combined_df %>%
+      # replace missing values with values on the margins
+      replace_na(list(log2_FC_x = missing_point_value, log2_FC_y = missing_point_value))
+
+    # pull list of proteins to give text labels
+    significant_no_missing <- combined_df %>%
+      filter(
+        significance != "Not significant",
+        log2_FC_x != missing_point_value,
+        log2_FC_y != missing_point_value
+      )
+    label_data <- rbind(
+      # top by distance from identity
+      significant_no_missing %>%
+        arrange(distance_from_identity) %>%
+        tail(num_top),
+      # top by distance from origin
+      significant_no_missing %>%
+        arrange(dist_from_orig) %>%
+        tail(num_top),
+      # top only quantified at x
+      combined_df %>%
+        arrange(abs(log2_FC_x)) %>%
+        filter(
+          significance != "Not significant",
+          (log2_FC_y == missing_point_value)
+        ) %>%
+        tail(num_top / 2),
+      # top only quantified at y
+      combined_df %>%
+        arrange(abs(log2_FC_y)) %>%
+        filter(
+          significance != "Not significant",
+          (log2_FC_x == missing_point_value)
+        ) %>%
+        tail(num_top / 2)
+    ) %>% distinct()
+    
+    if (length(top) > 0){
+      label_data <- combined_df %>% filter(significance != "Not significant", alias %in% top)
+    }
+    
+    print(top[!top %in% unique(label_data$alias)])
+    print("CAVIN2" %in% combined_df$alias)
+    print("SDPR" %in% combined_df$alias)
+
+    plot <- combined_df %>%
+      # sort so labeled points are stacked on top
+      mutate(z_order = alias %in% unique(label_data$alias)) %>%
+      arrange(z_order) %>%
+      ggplot(aes(
+        x = log2_FC_x,
+        y = log2_FC_y,
+        fill = significance,
+        label = alias
+      )) +
+      # margin lines
+      geom_hline(
+        yintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      geom_vline(
+        xintercept = margin_position,
+        size = LINE_WIDTH,
+        color = "black"
+      ) +
+      # origin lines
+      geom_hline(
+        yintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      geom_vline(
+        xintercept = 0,
+        color = "grey90",
+        size = LINE_WIDTH
+      ) +
+      # diagonal boundary lines
+      geom_segment(
+        data = data.frame(),
+        aes(
+          x = c(margin_position, margin_position, margin_position + 1),
+          y = c(margin_position + 1, margin_position, margin_position),
+          xend = c(max - 1, max, max),
+          yend = c(max, max, max - 1),
+          linetype = c("dashed", "solid", "dashed")
+        ),
+        size = LINE_WIDTH,
+        inherit.aes = FALSE,
+        show.legend = FALSE,
+        color = "black"
+      ) +
+      # scatterplot
+      geom_point(
+        shape = 21,
+        stroke = 0,
+        alpha = 0.55,
+        size = 1.4,
+      ) +
+      # protein labels
+      geom_text_repel(
+        data = label_data,
+        size = 1.94028,
+        family = FONT_FAMILY,
+        min.segment.length = 0,
+        #force = 3,
+        segment.size = LINE_WIDTH,
+        max.overlaps = Inf,
+        #nudge_y = -2,
+        #nudge_x = 2,
+        show.legend = FALSE#,
+        #segment.curvature = -0.1,
+      #segment.ncp = 3,
+      #segment.angle = 45
+      ) +
+      turboid_theme() +
+      theme(
+        aspect.ratio = 1,
+        # 20 lines of legend formatting
+        legend.position = "top",
+        legend.text = element_text(
+          size = 6,
+          color = "black",
+          family = "Arial",
+          margin = margin(l = 0)
+        ),
+        legend.box.background = element_blank(),
+        legend.justification.top = "top",
+        legend.justification = "center",
+        legend.box.just = "center",
+        legend.key = element_blank(),
+        legend.margin = margin(l = -5, b = -5.5),
+        legend.box.margin = margin(l = -5, b = -0.8),
+        legend.key.spacing.y = unit(-0.9, "cm"),
+        legend.key.spacing.x = unit(-0.1, "cm")
+      ) +
+      guides(fill = guide_legend(nrow = 2, override.aes = list(alpha = 1))) +
+      labs(
+        x = x_lab,
+        y = y_lab
+      ) +
+      scale_fill_manual(values = correlation_palette, name = NULL) +
+      scale_x_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_y_continuous(expand = expansion(mult = 0), limits = c(min, max)) +
+      scale_linetype_manual(values = c("dashed" = "dashed", "solid" = "solid")) +
+      geom_text(
+        mapping = aes(
+          x = min * 0.6,
+          y = max * 0.85,
+        ),
+        label = paste("R = ", as.character(pearson_r)),
+        inherit.aes = FALSE,
+        data = data.frame(),
+        size = 1.94028,
+        family = FONT_FAMILY
+      )
+
+    print(plot)
+    return(plot)
+}
+```
