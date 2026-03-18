@@ -1,47 +1,20 @@
-# TurboID
+# Cell Type-Specific Proximity Labeling Analysis
 
-Note for step to step guide: see /Dropbox (Dropbox @RU)/TurboID manuscript/Mass-spectrometry datasets/02_metadata/metadata_turbo_id.xlsx, Analysis details tab - Access to Vinogradova Lab Windows Remote Desktop is necessary
+Analysis code accompanying the 2026 manuscript
 
-### **Step 0 (set up pipeline)**
----------------------------------------------------------------------------------------------------------------------------------------------
-- docker build -t turboid_downstream . 
-- docker save turboid_downstream > turboid_downstream_date.tar
-- move tar to windows remote 
-- docker image load -i turboid_downstream.tar
+## Repository Structure
 
-### **Step 1 (processing of raw census-out files)**
----------------------------------------------------------------------------------------------------------------------------------------------
-Windows: 
-- Open Windows remote 
-- Open powershell 
-- type: cd /Users/Public
-- .\start_pipeline.ps1 process_file_folder
+| Folder | Description | Author |
+|---|---|---|
+| `scripts/` | Processing of raw mass spectrometry searches | [Nathalie Ropek](nropek@protonmail.com) |
+| `notebooks/` | Figure generation and post-processing | [Henry Sanford](hsanford@rockefeller.edu) |
+| `templates/` | Examples of formatted metadata for mass spec processing | [Nathalie Ropek](nropek@protonmail.com) |
+| `data/` | Reference datasets for annotating protein secretion | [Nathalie Ropek](nropek@protonmail.com) |
 
-Mac with Docker installed: 
-- go to data analysis pipeline folder (where start_pipeline.sh is located, note this project is in gitlab/data_analysis_pipeline) 
-- docker build -t vino_ms . 
-- ./start_pipeline.sh process_file_folder
+## Guide to processing raw mass spectrometry searches
 
-Then: 
-- enter input folder path: copy path to where the census file folder is 
-- enter output folder path: copy path to where you want to save everything
----------------------------------------------------------------------------------------------------------------------------------------------
-
-Files were processed with the Vinogradova Lab pipeline and were treated as “whole proteome” files – i.e., we quantify protein expression changes and corresponding peptide values were summed to receive the respective raw signal intensity per protein
-
---> Processing details
-- Files were processed twice: 
-  - with the restriction that at least 1 peptide must be present per protein
-  - with the restriction that at least 2 peptides must be present per protein 
-- Additionally following filters were used:
-  - Non unique peptides were removed
-  - Peptides that are not fully tryptic were removed
-  - Peptides with more than 1 missed cleavage site were removed
-
-Note: make sure to add (copy from old folders) both conditions_metadata.csv and metadata_col.csv - these files are needed for renaming the channels as well as specifying which are cre- and cre+ conditions
-
-### **Step 2a (mouse_fasta_to_FP_TP_tables_without_signalp.py) - This step is for reference in case fasta file tables need to be modified!**
-- create main table (based off of our mouse fasta file used for IP2 search)
+### Step 1 (mouse_fasta_to_FP_TP_tables_without_signalp.py) - for reference in case fasta file need to be modified
+- create main table containing protein metadata (based off of our mouse fasta file used for proteomics search)
   - read in fasta file to get all uniprot IDs
   - use uniprot.org to get all annotations for these proteins
   - label proteins as TP based on following criteria in subcellular location column: 
@@ -50,47 +23,21 @@ Note: make sure to add (copy from old folders) both conditions_metadata.csv and 
     - obtain human-mouse gene orthologs by following tutorial: [How to get all the orthologous genes between two species](https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/) 
     - this allows us to get the correct mouse gene names which correspond to the mitomatrix protein list, we then crossreference our fasta table and label them as FP
   - additionally make sure that if there is a SignalP annotation (ie if SignalP column is not empty) for a protein marked as FP then remove the FP annotation, also if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
-  - crossreference table with secretion prediction resource shared by Corey 
-  - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
+  - crossreference table with secretion prediction resource
+  - crossreference main list with spleen, adipose tissue etc.
   - crossreference table with Crapome database - cutoff > 200
   - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
   - save table
-  - Number of TP proteins: 2806
-  - Number of FP proteins: 435
-
-### **Step 2b (mouse_fasta_to_FP_TP_tables_with_signalp.py) - This step is for reference in case fasta file tables need to be modified!**
-- create main table (based off of our mouse fasta file used for IP2 search)
-  - read in fasta file to get all uniprot IDs
-  - use uniprot.org to get all annotations for these proteins
-  - label proteins as TP based on following criteria in subcellular location column: 
-    - "Endoplasmic Reticulum", "Secreted", "secreted", "Endoplasmic reticulum", "Rough endoplasmic reticulum", "endoplasmic reticulum"
-  - label proteins as FP if uniprot id is found in human mitomatrix list from supplementary table S1 [Rhee et al. 2013](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3916822/)
-    - obtain human-mouse gene orthologs by following tutorial: [How to get all the orthologous genes between two species](https://www.ensembl.info/2009/01/21/how-to-get-all-the-orthologous-genes-between-two-species/) 
-    - this allows us to get the correct mouse gene names which correspond to the mitomatrix protein list, we then crossreference our fasta table and label them as FP
-  - add table shared by Corey "secretion prediction resource" to main table and check if if sp_score > 0.7 and ups_score == 0 is True otherwise exclude the proteins from TP list
-  - if protein is marked as both TP and FP, keep it in the TP list and remove it from FP list
-  - crossreference table with secretion prediction resource shared by Corey 
-  - crossreference main list with spleen, adipose tissue etc. (files provided by Ken)
-  - crossreference table with Crapome database - cutoff > 200
-  - import NCBI gene annotations (using goatools package) and crossreference gene symbols to add gene_ids into our final list (for go term analysis)
-  - save table
-  - Number of TP proteins: 1602
-  - Number of FP proteins: 438
 
 
-### **Step 3 (turboid_analysis_pipeline.py)**
+### Step 2 (turboid_analysis_pipeline.py)
 
 ---------------------------------------------------------------------------------------------------------------------------------------------
-Windows: 
-- Open Windows remote 
-- Open powershell as administrator 
-- type: cd /Users/Public
-- .\start_turbo_id_downstream.ps1 process_data
 
 Mac with Docker installed: 
 - go to data turboid folder (where start_turbo_id_downstream.sh is located)
-- docker build -t turboid_downstream . 
-- ./start_turbo_id_downstream.sh process_data
+- `docker build -t turboid_downstream .` 
+- `./start_turbo_id_downstream.sh process_data`
 
 Then: 
 - follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
@@ -141,7 +88,7 @@ Go term analysis with significant up/down/up and down regulated proteins - imple
 Each file folder has a separate goterm_analysis folder which holds the plots and tables. The names of the files follow this scheme:
 goterm_BACKGROUND_CONDITION _DOWN/UP/DOWN&UP_go_term_plot.csv or pdf
  
-More details: GOEA analysis was performed on the significant up or down or up & down regulated proteins (mapped to gene IDs). Enriched ontologies with a Benjamini-Hochberg-corrected p-value less than 0.05 were retained and top 10 terms were plotted. I am happy to improve the plots as I think the color and shape definitely need improvement but as far as information, they show number of genes and FDR which I hope will be helpful in interpreting them. I also provide corresponding tables which also show the names of the genes for each term. I also want to note that there are some proteins that I could not map to gene ids, which means if they are significantly up or down regulated they are not included in the goterm analysis because they don’t have a gene id  – I will need to look more into this, and will keep you all updated but for now I just wanted to share what I have. Some plots are empty which means that nothing passed the p-value 0.05 threshold.
+More details: GOEA analysis was performed on the significant up or down or up & down regulated proteins (mapped to gene IDs). Enriched ontologies with a Benjamini-Hochberg-corrected p-value less than 0.05 were retained and top 10 terms were plotted. 
 
 **Volcano plots**
 
@@ -151,7 +98,7 @@ For every protein the log2 fold-change of the ratio between condtions was calcul
 
 A heatmap of top proteins is provided as pdf (can be searched cmd+F) and can be compared to volcano plots
 
-### Details Cutoff ROC analysis 
+### Details of ROC cutoff analysis 
 Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41596-020-0399-0)
 
 1. Calculate Ratios per condition (example of one condition) 
@@ -189,58 +136,4 @@ Following the approach of: [Cho et al. 2020](https://www.nature.com/articles/s41
      - “TPR-FPR” columns: True positive rate – False positive rate for this protein (y axis in line plot)
      - “pass_cutoff” columns: 1/0  = passed cutoff/did not pass cutoff
 
-
-### **Step 4 (create_lists_for_yuval.py)**
-
-
----------------------------------------------------------------------------------------------------------------------------------------------
-Windows: 
-- Open Windows remote 
-- Open powershell as administrator 
-- type: cd /Users/Public
-- .\start_turbo_id_downstream.ps1 create_lists_for_yuvals_group
-
-Mac with Docker installed: 
-- go to data turboid folder (where start_turbo_id_downstream.sh is located)
-- docker build -t turboid_downstream . 
-- ./start_turbo_id_downstream.sh create_lists_for_yuvals_group
-
-Then: 
-- follow instructions in templates/metadata_turbo_id.xlsx, Analysis details tab
----------------------------------------------------------------------------------------------------------------------------------------------
-
-This script finds all significantly up and down regulated proteins per comprison from all files, and merges it together into one file. We want to avoid havng duplciates so that we can send a protein list (human uniprot id column) to collaborators. 
-
-### **Other Notes:**
-
-**Notes for file: processed_census-out_04172023_CRW_A-5_16pl_M**
-- condition scheme does not match other files so needed to make follwing changes:
-  - usually we compare the two conditions in a file in the end this is not the case here so skipping final pass_cutoff filter - which checks if either condition has passed with min 2 replicates - for this file specifically we treat GFAP and BAT individually thats why each condition has its own final table (BAT - min 2 replicates must have passed cutoff to be in final protein list (-> volcano plot), GFAP: at least one of the 3 ratios must have passed to be in final protein list (->scatterplots)) 
-  - for GFAP cre+ filtering is done on all 3 cre+ channels (ctrl, fast, LPS) if at least 2 pass sum and cv then protein passes, Cre(-)_Ctrl_W6 is the control for all Cre(+) samples 
-  - since there are no replicates for GFAP - creating scatterplots to compare fold change for GFAP  
-
-
-**Notes for comparing files 20230512_EV2-28A (male) vs. 20230513_EV2-28B (female):**
-- First we processed both files individually 
-- Using the filtered and normalized files perform normalization to sum per protein (channel ratio)
-  
- **1**
-
-- Then male and female files were merged 
-- And PCA plot was created 
-- Proteins detected in male file: 1231 
-- Proteins detected in female file: 1297
-- Only ~300 overlap
-
-**2**
-
-- Using filtered, normalized and roc result
-- Normalization to sum per protein (channel ratio)
-- Then male and female files were merged 
-- And PCA plot was created 
-- Proteins detected in male file: 745 
-- Proteins detected in female file: 1011
-- And only 170 overlap after ROC 
-
-Todo: investigate overlaping proteins
 
